@@ -11,7 +11,7 @@ A Minecraft-style PvP combat game that runs in your browser. Fight smart bots or
 - **Smart bots:** pick the type and difficulty of each bot (Beginner → Godlike). Bots strafe and dodge, W-tap, block with shields, web-trap you, wind-charge + mace combo, bridge, pillar, tunnel, hide to heal, and make human mistakes.
 - **Online multiplayer:** host a room, share the 5-letter code, and play with up to 4 friends (peer-to-peer, no server needed).
 - **Modes and maps:** Duel, Free-for-all, Team fight or Juggernaut (you vs an army), with kit modes (Sword, Cobweb, Mace, Axe & Shield, Pot PvP, UHC, Full SMP, Custom). Maps: Big Biome World, Arena, Sky Bridges, Sunflower Plains, Cave, Nether, Snowy Peaks, Desert Canyon.
-- **Elytra, firework rockets and ender pearls**, a 27-slot backpack (press E) that remembers your layout between games, and auto step-up for stairs.
+- **Elytra, firework rockets and ender pearls**, a 27-slot backpack (press E) that remembers your layout between games.
 - **Kill-cam and full match replays:** scrub the timeline, change speed, and watch from anyone's eyes or with a free camera.
 - **Fully rebindable controls.**
 

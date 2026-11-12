@@ -234,22 +234,6 @@ function giveLoot(p, it) {
 }
 buildMenu();
 
-// ---------- auto step-up: walk up 1-block steps (stairs) without jumping ----------
-if (CFG.autoStep === undefined) CFG.autoStep = true; DEF.autoStep = true;
-const _travelStep = travel;
-travel = function (e, strafe, forward) {
-  if (e === player && CFG.autoStep && e.onGround && !e.inWater && !e.gliding && (strafe || forward) && tick - (e._stepT || -9) > 3) {
-    const yr = e.yaw * DEG, mx = strafe * Math.cos(yr) - forward * Math.sin(yr), mz = forward * Math.cos(yr) + strafe * Math.sin(yr), ml = Math.hypot(mx, mz);
-    if (ml > 0.1) {
-      const ux = mx / ml, uz = mz / ml, fy = Math.floor(e.y + 0.01), px = e.x + ux * 0.62, pz = e.z + uz * 0.62;
-      if (isSolid(getB(px, fy, pz)) && !isSolid(getB(px, fy + 1, pz)) && !isSolid(getB(px, fy + 2, pz)) &&
-          boxFree([e.x - 0.3, fy + 1, e.z - 0.3, e.x + 0.3, fy + 2.8, e.z + 0.3])) { e.y = fy + 1; e._stepT = tick; e.vy = Math.max(e.vy, 0); }
-    }
-  }
-  return _travelStep(e, strafe, forward);
-};
-(function () { const rows = MENU[2].rows, i = rows.findIndex(x => x[0] === 'fov'); rows.splice(i + 1, 0, ['autoStep', 'Auto step-up (walk up stairs / 1-block steps without jumping)', 'tg']); })();
-
 // ---------- ender pearls: right-click to throw, you teleport where it lands (costs 2.5 hearts) ----------
 ICON.pearl = pxArt(px => {
   for (let y = 3; y < 13; y++) for (let x = 3; x < 13; x++) { const d = Math.hypot(x - 7.5, y - 7.5); if (d > 4.8) continue; px(x, y, d > 4 ? '#0b3b36' : d < 1.6 ? '#7fe7d0' : (x + y) % 3 === 0 ? '#2fa58f' : '#17695c'); }
