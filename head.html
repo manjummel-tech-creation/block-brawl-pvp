@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Block Brawl PvP</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#000;--fg:#e8e8e8;--accent:#ffff70}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;color:var(--fg);font-family:'VT323',monospace;user-select:none;-webkit-user-select:none}
+canvas{display:block}
+#gl{position:fixed;inset:0;width:100%;height:100%}
+#hud{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;image-rendering:pixelated}
+.scr{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;overflow-y:auto;z-index:10}
+.hidden{display:none!important}
+#menu{background:rgba(0,0,0,.45);padding:18px 16px 30px;box-sizing:border-box}
+.title{font-size:84px;line-height:.9;color:#c6c6c6;text-shadow:5px 5px #3a3a3a,0 0 30px rgba(0,0,0,.6);letter-spacing:4px;margin-top:6px;text-align:center}
+.title span{color:var(--accent);font-size:48px;margin-left:12px;text-shadow:4px 4px #3f3f00;display:inline-block;transform:rotate(-12deg)}
+.sub{font-size:24px;color:#ffff55;text-shadow:2px 2px #3f3f15;margin:4px 0 14px;text-align:center}
+#cols{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;max-width:1400px;width:100%}
+.panel{background:rgba(20,20,20,.78);border:3px solid #000;box-shadow:inset 3px 3px #555,inset -3px -3px #222;padding:10px 14px 12px;flex:1 1 360px;max-width:460px;box-sizing:border-box}
+.panel h2{margin:0 0 6px;font-size:28px;font-weight:normal;color:#fff;text-shadow:2px 2px #333;border-bottom:2px solid #444}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:7px 0}
+.row label{width:100%;font-size:21px;color:#bbb}
+.row .val{color:var(--accent);margin-left:6px}
+.mc{font-family:'VT323',monospace;font-size:20px;color:#e0e0e0;background:linear-gradient(#8b8b8b,#6a6a6a);border:2px solid #000;box-shadow:inset 2px 2px #b0b0b0,inset -2px -2px #4a4a4a;text-shadow:2px 2px #3a3a3a;padding:2px 10px;cursor:pointer;min-height:30px}
+.mc:hover{background:linear-gradient(#8394d6,#5b6cb4);color:#ffffa0}
+.mc.on{background:linear-gradient(#5aa03a,#3b7824);color:#fff;box-shadow:inset 2px 2px #8fd060,inset -2px -2px #234d14}
+.mc.big{font-size:34px;padding:6px 60px;margin-top:16px}
+.mc:disabled{opacity:.45;cursor:default}
+input[type=range]{width:100%;accent-color:#5aa03a;height:22px}
+.help{margin-top:14px;font-size:19px;color:#aaa;text-align:center;max-width:1000px;line-height:1.2}
+.scr h1{font-size:64px;font-weight:normal;margin:12vh 0 20px;text-shadow:4px 4px #333;text-align:center}
+#pause,#end,#dead{background:rgba(40,0,0,.0);justify-content:flex-start;gap:10px}
+#pause{background:rgba(0,0,0,.6)}
+#end{background:rgba(0,0,0,.7)}
+#dead{background:rgba(120,0,0,.45)}
+#pause .mc,#end .mc,#dead .mc{width:340px;max-width:90vw;font-size:26px;min-height:44px}
+#feed{position:fixed;top:10px;right:12px;text-align:right;font-size:22px;z-index:5;pointer-events:none}
+#feed div{background:rgba(0,0,0,.45);padding:1px 8px;margin-bottom:3px;text-shadow:2px 2px #000;transition:opacity .5s}
+#center{position:fixed;left:0;right:0;top:28%;text-align:center;font-size:72px;color:#fff;text-shadow:5px 5px #3a3a3a;pointer-events:none;z-index:5}
+#center small{display:block;font-size:30px;color:#ffff55}
+#score{position:fixed;left:50%;top:60px;transform:translateX(-50%);background:rgba(0,0,0,.65);padding:8px 14px;font-size:22px;z-index:6;min-width:420px}
+#score table,#endStats table{border-collapse:collapse;width:100%}
+#score td,#score th,#endStats td,#endStats th{padding:1px 10px;text-align:left}
+#score th,#endStats th{color:#aaa;font-weight:normal}
+#endStats{background:rgba(0,0,0,.5);padding:10px 16px;font-size:22px;max-width:94vw;overflow-x:auto;margin-bottom:10px}
+#dbg{position:fixed;left:8px;top:6px;font-size:19px;white-space:pre;text-shadow:2px 2px #000;pointer-events:none;z-index:5;line-height:1.05}
+#tinfo{position:fixed;left:50%;top:10px;transform:translateX(-50%);text-align:center;font-size:22px;text-shadow:2px 2px #000;pointer-events:none;z-index:5}
+#tinfo .bar{width:220px;height:8px;background:#300;border:2px solid #000;margin:2px auto 0}
+#tinfo .bar div{height:100%;background:#e33}
+#tinfo .bar div.ab{background:#f2c200}
+#lockhint{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);font-size:24px;background:rgba(0,0,0,.6);padding:4px 12px;z-index:5;pointer-events:none}
+@media (max-width:600px){.title{font-size:54px}.title span{font-size:32px}}
+</style></head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="hud"></canvas>
+<div id="feed"></div><div id="center"></div><div id="dbg"></div><div id="tinfo"></div>
+<div id="score" class="hidden"></div>
+<div id="lockhint" class="hidden">Click to capture the mouse</div>
+<div id="menu" class="scr">
+  <div class="title">BLOCK BRAWL<span>PvP!</span></div>
+  <div class="sub">Minecraft-style combat vs smart bots · real knockback, i-frames, crits &amp; cooldowns</div>
+  <div id="cols"></div>
+  <button id="play" class="mc big">PLAY</button>
+  <div class="help">WASD move · Space jump · Ctrl sprint (or double-tap W) · Shift sneak · Left click attack / mine · Right click bow / eat / place / sword-block (1.8)<br>1–9 or mouse wheel hotbar · V or F5 camera · F3 debug · B hitboxes · Tab scoreboard · Esc pause<br>Every control can be rebound in the Controls panel.</div>
+</div>
+<div id="pause" class="scr hidden">
+  <h1>Game Paused</h1>
+  <button id="resume" class="mc">Back to Game</button>
+  <button id="pControls" class="mc">Settings &amp; Controls</button>
+  <button id="restart" class="mc">Restart Match</button>
+  <button id="quit" class="mc">Quit to Menu</button>
+</div>
+<div id="dead" class="scr hidden">
+  <h1>You died!</h1>
+  <div id="deadMsg" style="font-size:26px;margin-bottom:10px"></div>
+  <button id="spectate" class="mc">Spectate</button>
+  <button id="deadRestart" class="mc">Restart Match</button>
+  <button id="deadMenu" class="mc">Quit to Menu</button>
+</div>
+<div id="end" class="scr hidden">
+  <h1 id="endTitle"></h1>
+  <div id="endStats"></div>
+  <button id="again" class="mc">Play Again</button>
+  <button id="endMenu" class="mc">Quit to Menu</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
