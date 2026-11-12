@@ -7,8 +7,10 @@
   function show(msg) {
     var d = document.getElementById('bootErr');
     if (!d) { d = document.createElement('div'); d.id = 'bootErr'; d.style.cssText = 'position:fixed;left:10px;right:10px;top:10px;z-index:99999;background:#400;color:#fff;border:2px solid #f66;padding:10px 14px;font:16px monospace;white-space:pre-wrap'; (document.body || document.documentElement).appendChild(d); }
-    d.textContent += (d.textContent ? '\n' : 'Block Brawl could not start in this browser:\n') + msg;
+    if (!d.querySelector('pre')) { d.innerHTML = '<b>Block Brawl hit a problem in this browser:</b><pre style="margin:6px 0;white-space:pre-wrap"></pre><button id="bootReset" style="font:15px monospace;padding:4px 10px;cursor:pointer">Reset saved settings &amp; reload</button> <span style="opacity:.8">(send me a screenshot of this box if it keeps happening)</span>'; d.querySelector('#bootReset').onclick = function () { try { Object.keys(localStorage).forEach(function (k) { if (/^(blockbrawl|bb)/i.test(k)) localStorage.removeItem(k); }); } catch (e) {} location.reload(); }; }
+    d.querySelector('pre').textContent += msg + '\n';
   }
+  window.addEventListener('unhandledrejection', function (e) { show('promise: ' + (e.reason && (e.reason.message || e.reason))); });
   window.addEventListener('error', function (e) { show((e.message || 'error') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')); });
   window.addEventListener('load', function () {
     try { var c = document.createElement('canvas'); if (!(c.getContext('webgl') || c.getContext('experimental-webgl'))) show('3D graphics (WebGL) are turned off or not supported. Turn on hardware acceleration in your browser settings.'); } catch (e) {}
