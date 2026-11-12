@@ -1,5 +1,5 @@
-// ================= ROCKETS IN DUELS (option) =================
-// Match settings -> "Rockets in duels": Off / 16 / 32 / 64. In a Duel every human fighter (you, and friends online)
+// ================= ROCKETS IN EVERY MODE (option) =================
+// Match settings -> "Rockets in duels": Off / 16 / 32 / 64. In every mode every human fighter (you, and friends online)
 // gets an elytra plus that many firework rockets. Right-click a rocket to launch into a glide or boost while gliding.
 if (CFG.duelRockets === undefined) CFG.duelRockets = '0'; DEF.duelRockets = '0';
 function giveDuelRockets(m) {
@@ -28,12 +28,12 @@ function giveDuelRockets(m) {
 const _startGameDuelRk = startGame;
 startGame = function () {
   _startGameDuelRk();
-  if (!game || CFG.mode !== 'duel' || game.mafia || !(+CFG.duelRockets)) return;
+  if (!game || game.mafia || !(+CFG.duelRockets)) return;
   for (const m of mobs) if (m.isPlayer) giveDuelRockets(m);
 };
 G.startGame = startGame;
 (function () {
   const rows = MENU[1].rows, i = rows.findIndex(x => x[0] === 'elytra');
-  rows.splice(i + 1, 0, ['duelRockets', 'Rockets in duels (comes with an elytra)', 'ch', [['0', 'Off'], ['16', '16'], ['32', '32'], ['64', '64']]]);
+  rows.splice(i + 1, 0, ['duelRockets', 'Rockets (every mode, comes with an elytra)', 'ch', [['0', 'Off'], ['16', '16'], ['32', '32'], ['64', '64']]]);
 })();
 buildMenu();
