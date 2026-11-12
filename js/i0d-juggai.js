@@ -163,3 +163,21 @@ botTick = function (b) {
   if (b._windRolled && tick >= (b.windEscCD || 0) + 1 && b.windEscCD > 0 && tick - b.windEscCD > 0 && tick - b.windEscCD < 2) b._windRolled = false;
   return _botTickWindRare(b);
 };
+
+// ---------- Juggernaut: armour is much harder to break (a piece every 90 hits instead of 35) ----------
+const _startGameArmorJugg2 = startGame;
+startGame = function () {
+  _startGameArmorJugg2();
+  if (!game) return;
+  for (const m of mobs) m.armorEvery = game.jugg ? 90 : 35;
+};
+G.startGame = startGame;
+
+// ---------- hits from the ground (not jump crits / mace smashes) push 1.5x further sideways ----------
+const _attackGroundKB2 = attack;
+attack = function (a, t, reach) {
+  const vx = t.vx, vz = t.vz, grounded = a.onGround && !a.inWater && !(a.held && a.held.k === 'mace' && a.fallDistance > 1.5);
+  const r = _attackGroundKB2(a, t, reach);
+  if (r && grounded && !t.dead) { t.vx = vx + (t.vx - vx) * 1.5; t.vz = vz + (t.vz - vz) * 1.5; }
+  return r;
+};
