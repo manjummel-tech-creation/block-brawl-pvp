@@ -1,6 +1,14 @@
 // ================= RENDERER, INPUT, HUD, MENUS, GAME FLOW =================
 const glCanvas = $('#gl'), hud = $('#hud'), hctx = hud.getContext('2d');
-const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: false, powerPreference: 'high-performance' });
+const renderer = (() => {                   // try gentler settings if the browser refuses the first 3D context
+  const tries = [{ powerPreference: 'high-performance' }, { powerPreference: 'default' }, { powerPreference: 'low-power', precision: 'mediump' }, { powerPreference: 'low-power', precision: 'mediump', legacy: true }];
+  let last;
+  for (const t of tries) {
+    try { const R = t.legacy && THREE.WebGL1Renderer ? THREE.WebGL1Renderer : THREE.WebGLRenderer; return new R({ canvas: glCanvas, antialias: false, failIfMajorPerformanceCaveat: false, powerPreference: t.powerPreference, precision: t.precision || 'highp' }); }
+    catch (e) { last = e; }
+  }
+  throw new Error('This browser blocked 3D graphics (WebGL) for this page. Fix: fully QUIT the browser (Cmd+Q) and reopen it - browsers block 3D after a graphics crash. If it still happens, turn on "Use graphics acceleration when available" in the browser settings. (' + (last && last.message) + ')');
+})();
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 const scene = new THREE.Scene();
 const SKY = 0x8ab8ff;

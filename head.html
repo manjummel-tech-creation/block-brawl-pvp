@@ -13,7 +13,7 @@
   window.addEventListener('unhandledrejection', function (e) { show('promise: ' + (e.reason && (e.reason.message || e.reason))); });
   window.addEventListener('error', function (e) { show((e.message || 'error') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')); });
   window.addEventListener('load', function () {
-    try { var c = document.createElement('canvas'); if (!(c.getContext('webgl') || c.getContext('experimental-webgl'))) show('3D graphics (WebGL) are turned off or not supported. Turn on hardware acceleration in your browser settings.'); } catch (e) {}
+    try { var c = document.createElement('canvas'); if (!(c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl'))) show('3D graphics (WebGL) are blocked in this browser right now. Most often this happens after a graphics crash: fully QUIT the browser (Cmd+Q) and reopen it. If that does not help, turn on hardware acceleration ("Use graphics acceleration when available") in the browser settings and restart it.'); } catch (e) {}
   });
 })();
 </script>
