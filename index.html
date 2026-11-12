@@ -8780,8 +8780,9 @@ startGame = function () {
   const army = mobs.filter(m => !m.isPlayer);
   army.forEach((b, i) => {
     const r = Math.random();
-    b.rank = r < 0.22 ? 'elite' : r < 0.6 ? 'vet' : 'grunt';
-    b.skill = b.rank === 'elite' ? 0.92 + Math.random() * 0.08 : b.rank === 'vet' ? 0.7 + Math.random() * 0.12 : 0.38 + Math.random() * 0.17;
+    b.rank = r < 0.4 ? 'elite' : r < 0.82 ? 'vet' : 'grunt';
+    b.hunter = b.rank !== 'grunt';
+    b.skill = b.rank === 'elite' ? 0.96 + Math.random() * 0.04 : b.rank === 'vet' ? 0.82 + Math.random() * 0.1 : 0.45 + Math.random() * 0.15;
     if (b.rank === 'elite') { b.shield = true; b._hider = Math.random() < 0.6; }
     if (b.rank === 'grunt') b._hider = Math.random() < 0.25;
     b.name = (b.rank === 'elite' ? '★ ' : b.rank === 'vet' ? '' : '· ') + b.name.replace(/^[★·] /, '');
@@ -8820,7 +8821,14 @@ function jaDigCell(b) { return { x: Math.floor(b.x), y: Math.floor(b.y + 0.01), 
 const _botTickJA = botTick;
 botTick = function (b) {
   const S0 = b._ja;
-  if (!(S0 && (S0.mode === 'dig' || S0.mode === 'lurk') && JUGG && !b.dead)) _botTickJA(b);   // while dug in, the ambush is in full control
+  if (!(S0 && (S0.mode === 'dig' || S0.mode === 'lurk') && JUGG && !b.dead)) {
+    // hunters (elites + veterans) don't sit and hide far away or run off: they come for you with the full fighting AI
+    if (JUGG && game && game.jugg && b.hunter && !b.dead && b.ai && player && !player.dead) {
+      b.ai.t = player; b.ai.retarget = 40; const X = b.ai.x; if (X) { X.rt = 40; if (X.plan === 'flee' && b.health + b.absorption > 8) { X.plan = 'fight'; X.planT = 40; } }
+      game.jugg = false; try { _botTickJA(b); } finally { game.jugg = true; }
+      b.ai.t = player;
+    } else _botTickJA(b);
+  }   // while dug in, the ambush is in full control
   else { const X = b.ai && b.ai.x; if (X) { X.hide = null; X.dig = null; X.tower = null; X.seek = null; } }
   if (!JUGG || !game || !game.jugg || b.dead || !b.ai || !player || player.dead || game.countdown > 0 || !b.rank) return;
   if (b.inWeb || b.stunT > tick || b.using === 'eat' || b._macePh) { if (b._ja && b._ja.mode !== 'lurk') b._ja = null; return; }
@@ -8907,6 +8915,19 @@ botTick = function (b) {
 };
 const _toMenuJA = toMenu;
 toMenu = function () { for (const m of mobs) m._ja = null; _toMenuJA(); };
+
+// ---------- wind-charge escapes are rarer (they used to blast away almost every time you maced them low) ----------
+// one roll each time a bot gets low: ~20-35% it escapes, otherwise it can't try again for 10 s
+const _botTickWindRare = botTick;
+botTick = function (b) {
+  if (!b.dead && !b.isPlayer && b.health + b.absorption < 8 && tick >= (b.windEscCD || 0) && !b._windRolled) {
+    b._windRolled = true;
+    if (Math.random() > 0.2 + 0.15 * (b.skill || 0.5)) b.windEscCD = tick + 200;
+  }
+  if (b.health + b.absorption >= 10) b._windRolled = false;
+  if (b._windRolled && tick >= (b.windEscCD || 0) + 1 && b.windEscCD > 0 && tick - b.windEscCD > 0 && tick - b.windEscCD < 2) b._windRolled = false;
+  return _botTickWindRare(b);
+};
 // ================= SAVED SETTINGS FROM REMOVED MODES FALL BACK SAFELY =================
 (function () {
   const modes = MENU[0].rows.find(x => x[0] === 'mode'), maps = MENU[0].rows.find(x => x[0] === 'map');
