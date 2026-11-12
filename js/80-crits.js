@@ -12,5 +12,5 @@ const _drawHUDCrit = drawHUD;
 drawHUD = function (a) {
   _drawHUDCrit(a);
   if (state !== 'play' || !game || !player || player.dead || !CFG.crits) return;
-  if (player.onGround && !COMBAT18 && cooldown(player) >= 1) txt('✦', W / 2 + 20, H / 2 + 8, 24, '#ffdd55', 'center');
+  if (!player.onGround && player.vy < 0 && !player.gliding && !player.inWater) txt('✦', W / 2 + 20, H / 2 + 8, 24, '#ffdd55', 'center');
 };
