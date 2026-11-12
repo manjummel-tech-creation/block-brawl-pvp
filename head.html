@@ -1,6 +1,21 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <title>Block Brawl PvP</title>
+<script>
+// if anything fails to load or run, say so on screen instead of silently doing nothing
+(function () {
+  function show(msg) {
+    var d = document.getElementById('bootErr');
+    if (!d) { d = document.createElement('div'); d.id = 'bootErr'; d.style.cssText = 'position:fixed;left:10px;right:10px;top:10px;z-index:99999;background:#400;color:#fff;border:2px solid #f66;padding:10px 14px;font:16px monospace;white-space:pre-wrap'; (document.body || document.documentElement).appendChild(d); }
+    d.textContent += (d.textContent ? '\n' : 'Block Brawl could not start in this browser:\n') + msg;
+  }
+  window.addEventListener('error', function (e) { show((e.message || 'error') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')); });
+  window.addEventListener('load', function () {
+    try { var c = document.createElement('canvas'); if (!(c.getContext('webgl') || c.getContext('experimental-webgl'))) show('3D graphics (WebGL) are turned off or not supported. Turn on hardware acceleration in your browser settings.'); } catch (e) {}
+  });
+})();
+</script>
+
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <style>
@@ -84,5 +99,5 @@ input[type=range]{width:100%;accent-color:#5aa03a;height:22px}
   <button id="again" class="mc">Play Again</button>
   <button id="endMenu" class="mc">Quit to Menu</button>
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!--THREE-->
 <script>
