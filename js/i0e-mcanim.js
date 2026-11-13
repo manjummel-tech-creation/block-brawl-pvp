@@ -12,6 +12,7 @@ updateModels = function (alpha) {
   const age = now / 50;                                   // "ticks" for the idle sway
   for (const m of mobs) {
     const pr = m.parts; if (!pr || m.dead) { if (pr && pr.body) { pr.body.rotation.y = 0; pr.body.position.z = 0; } continue; }
+    if (!pr.root.visible && m !== player) continue;       // not drawn (far away): skip the animation work
     const yaw = m.isPlayer && !m.remote ? m.yaw : m.pyaw + wrapDeg(m.yaw - m.pyaw) * alpha;
     const speed = Math.hypot(m.vx, m.vz), moving = speed > 0.03;
 

@@ -76,6 +76,7 @@ applyShader = function () {
     SHD.on = false; sunL.castShadow = false;
     for (const ch of chunks) { if (ch.mo) ch.mo.castShadow = false; if (ch.ms) ch.ms.visible = false; }
   }
+  if (SHD.on) shdCull();                       // only the chunks near you take part
 };
 function shdCull() {
   const c = camera.position, R = SHD.R + 14;
