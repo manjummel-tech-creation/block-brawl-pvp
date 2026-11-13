@@ -184,7 +184,7 @@ drawHUD = function (alpha) {
   const needLock = !locked && !freeLook && !paused && !game.over && !(player.dead && game.win === 'last') && !G.noLockCheck;
   hint.textContent = 'Click to play — the mouse stays captured until you press Esc';
   hint.classList.toggle('hidden', !needLock);
-  if (!showDebug) $('#dbg').textContent += `\nCrits: ${CFG.crits ? 'ON  (jump hits + full-bar hits = x1.5)' : 'OFF'}`;
+  if (!showDebug) $('#dbg').textContent += `\nCrits: ${CFG.crits ? 'ON  (jump crits = x1.5)' : 'OFF'}`;
   const now = performance.now();
   if (now - critPopT < 700) txt('CRITICAL HIT!', W / 2, H / 2 - 34, 30, '#ffdd55', 'center');
   if (now - kbPopT < 450) txt('KNOCKBACK!', W / 2, H / 2 + 62, 22, '#9fe0ff', 'center');
@@ -531,7 +531,7 @@ botTick = function (b) {
 // ---------- 10. menu: new options + bot roster ----------
 (function () {
   const row = (sec, after, r) => { const rows = MENU[sec].rows, i = rows.findIndex(x => x[0] === after); rows.splice(i + 1, 0, r); };
-  row(0, 'combat', ['crits', 'Critical hits (jump hits + full-bar hits)', 'tg']);
+  row(0, 'combat', ['crits', 'Critical hits (jump crits only)', 'tg']);
   row(0, 'crits', ['moveSpeed', 'Movement speed', 'rng', [50, 130, 5, '%']]);
   row(0, 'moveSpeed', ['weight', 'Knockback taken (lower = heavier players)', 'rng', [30, 150, 5, '%']]);
   row(0, 'weight', ['chargedKb', 'Extra knockback: fully charged hit on the ground', 'rng', [0, 200, 10, '%']]);
