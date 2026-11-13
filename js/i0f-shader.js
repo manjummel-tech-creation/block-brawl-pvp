@@ -58,21 +58,64 @@ const _buildMenuShd = buildMenu;
 buildMenu = function () { _buildMenuShd(); applyShader(); };
 
 // ---------- per frame: the shadow box follows you, players cast shadows, characters are a touch wider ----------
+// Kept cheap: only the 6 main body boxes of each player cast (not every armour piece), the shadow map is redrawn
+// every 2nd frame, far chunks are skipped, and if the frame rate drops the shadows step down by themselves
+// (every 3rd frame at half resolution -> off) and come back when it's smooth again. Colours / textures never change.
+renderer.shadowMap.autoUpdate = false;
+SHD.frame = 0; SHD.level = 0; SHD.bad = 0; SHD.good = 0; SHD.lastT = performance.now(); SHD.ema = 16.7;
+function shdSetLevel(l) {
+  l = clamp(l, 0, 2); if (l === SHD.level) return; SHD.level = l;
+  const size = l === 0 ? 2048 : 1024;
+  if (sunL.shadow.mapSize.x !== size) { sunL.shadow.mapSize.set(size, size); if (sunL.shadow.map) { sunL.shadow.map.dispose(); sunL.shadow.map = null; } }
+  applyShader();
+}
+const _applyShaderLvl = applyShader;
+applyShader = function () {
+  _applyShaderLvl();
+  if (SHD.level >= 2 && SHD.on) {            // too slow for shadows right now: keep the colour grade, drop only the shadows
+    SHD.on = false; sunL.castShadow = false;
+    for (const ch of chunks) { if (ch.mo) ch.mo.castShadow = false; if (ch.ms) ch.ms.visible = false; }
+  }
+};
+function shdCull() {
+  const c = camera.position, R = SHD.R + 14;
+  for (const ch of chunks) {
+    if (!ch.mo) continue;
+    const near = Math.abs(ch.cx * 16 + 8 - c.x) < R && Math.abs(ch.cz * 16 + 8 - c.z) < R;
+    ch.mo.castShadow = SHD.on && near;
+    if (ch.ms) ch.ms.visible = SHD.on && near && ch.mo.visible;
+  }
+}
 const _updateModelsShd = updateModels;
 updateModels = function (alpha) {
   _updateModelsShd(alpha);
-  SHD.uT.value = performance.now() / 1000;
+  const now = performance.now(), ft = now - SHD.lastT; SHD.lastT = now;
+  SHD.uT.value = now / 1000; SHD.frame++;
   for (const m of mobs) {
     const pr = m.parts; if (!pr) continue;
     if (!pr._wide) { pr._wide = true; pr.body.scale.set(1.12, 1, 1.12); }
-    if (pr._shd !== SHD.on) { pr._shd = SHD.on; pr.body.traverse(o => { if (o.isMesh) o.castShadow = SHD.on; }); }
+    if (pr._shd !== SHD.on) {
+      pr._shd = SHD.on;
+      pr.body.traverse(o => { if (o.isMesh) o.castShadow = false; });
+      if (SHD.on) for (const g of [pr.body, pr.head, pr.armR, pr.armL, pr.legR, pr.legL]) { const first = g.children.find(c => c.isMesh); if (first) first.castShadow = true; }
+    }
+  }
+  // adaptive quality (only while actually playing, and only when shaders are switched on)
+  if (CFG.shader && CFG.gfx !== 'fast' && state === 'play' && !paused && ft > 0 && ft < 200) {
+    SHD.ema = SHD.ema * 0.95 + ft * 0.05;
+    if (SHD.ema > 21) { SHD.good = 0; if (++SHD.bad > 90) { SHD.bad = 0; shdSetLevel(SHD.level + 1); } }
+    else if (SHD.ema < 17.6) { SHD.bad = 0; if (++SHD.good > 1800) { SHD.good = 0; shdSetLevel(SHD.level - 1); } }
+    else { SHD.bad = Math.max(0, SHD.bad - 1); }
   }
   if (!SHD.on) return;
-  // centre the shadow box a little ahead of the camera, snapped to whole blocks so shadows don't shimmer
+  if (SHD.frame % 20 === 0) shdCull();
+  if (SHD.frame % (SHD.level === 0 ? 2 : 3) !== 0) return;
+  // centre the shadow box on the camera, snapped to whole blocks so shadows don't shimmer
   const c = camera.position, tx = Math.round(c.x), ty = Math.round(c.y) - 4, tz = Math.round(c.z);
   sunL.target.position.set(tx, ty, tz);
   sunL.position.set(tx + SHD_DIR.x * 120, ty + SHD_DIR.y * 120, tz + SHD_DIR.z * 120);
   sunL.target.updateMatrixWorld();
+  renderer.shadowMap.needsUpdate = true;
 };
 (function () {
   for (const sec of MENU) { const i = sec.rows.findIndex(x => x[0] === 'gfx'); if (i >= 0) { sec.rows.splice(i + 1, 0, ['shader', 'Shaders (sun shadows, richer colours, rippling water)', 'tg']); break; } }

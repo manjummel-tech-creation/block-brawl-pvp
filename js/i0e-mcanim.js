@@ -28,14 +28,15 @@ updateModels = function (alpha) {
     // ---- 2) walk cycle: legs swing wide, arms swing opposite (phase follows distance walked) ----
     const amp = m.limbAmp, ph = m.limb * 0.6662;
     const armBusy = m.swingT > 0 || m.using, sneak = m.sneaking && !m.gliding;
-    const legSw = Math.cos(ph) * 1.4 * amp * (sneak ? 0.6 : 1), armSw = Math.cos(ph + Math.PI) * 1.0 * amp;
+    const legSw = Math.cos(ph) * 1.0 * amp * (sneak ? 0.6 : 1), armSw = Math.cos(ph + Math.PI) * 0.7 * amp;   // calm, straight stride
     pr.legR.rotation.x = legSw; pr.legL.rotation.x = -legSw;
     pr.legR.rotation.y = 0; pr.legL.rotation.y = 0;
     if (!armBusy) { pr.armR.rotation.x = armSw; pr.armR.rotation.z = 0; pr.armR.rotation.y = 0; }
     if (!m.shieldUp && m.using !== 'bow') { pr.armL.rotation.x = -armSw; pr.armL.rotation.z = 0; }
 
     // ---- 3) idle sway: arms breathe in and out a little, always ----
-    const sz = Math.cos(age * 0.09 + m.id) * 0.05 + 0.05, sx = Math.sin(age * 0.067 + m.id) * 0.05;
+    const still = 1 - Math.min(1, amp * 3);                 // the idle sway fades out as soon as you walk (no wobble on top of the stride)
+    const sz = (Math.cos(age * 0.09 + m.id) * 0.04 + 0.04) * still, sx = Math.sin(age * 0.067 + m.id) * 0.04 * still;
     if (!armBusy) { pr.armR.rotation.z -= sz; pr.armR.rotation.x += sx; }
     if (!m.shieldUp && m.using !== 'bow') { pr.armL.rotation.z += sz; pr.armL.rotation.x -= sx; }
 
@@ -85,13 +86,13 @@ updateCamera = function (alpha, dt) {
   if (!p.onGround || p.gliding) { p._bobAmt = lerp(p._bobAmt || 0, 0, 0.2); } else p._bobAmt = lerp(p._bobAmt || 0, p.limbAmp, 0.2);
   const a = p._bobAmt || 0; if (a < 0.01) return;
   const ph = p.limb * 0.6662 * 0.5;
-  camera.rotation.z += Math.sin(ph) * a * 0.035;                    // roll side to side
-  camera.rotation.x -= Math.abs(Math.cos(ph - 0.2) * a) * 0.03;     // tiny dip on each step
-  const yawR = p.yaw * DEG, sway = Math.sin(ph) * a * 0.045;
+  camera.rotation.z += Math.sin(ph) * a * 0.006;                    // roll side to side
+  camera.rotation.x -= Math.abs(Math.cos(ph - 0.2) * a) * 0.004;     // tiny dip on each step
+  const yawR = p.yaw * DEG, sway = Math.sin(ph) * a * 0.012;
   camera.position.x += Math.cos(yawR) * sway; camera.position.z += Math.sin(yawR) * sway;
   // the hand bobs more than the old version
   const o = vmItem.visible ? vmItem : vmArm;
-  o.position.x += Math.sin(ph) * a * 0.035; o.position.y -= Math.abs(Math.cos(ph)) * a * 0.03;
+  o.position.x += Math.sin(ph) * a * 0.012; o.position.y -= Math.abs(Math.cos(ph)) * a * 0.01;
 };
 (function () {
   const rows = MENU[2].rows, i = rows.findIndex(x => x[0] === 'fov');
@@ -111,8 +112,8 @@ physicsTick = function (e) {
   if (!CFG.heavy || e.dead) return;
   // extra pull only on the way down (never while gliding, swimming, webbed or stunned mid-combo launch)
   if (!e.onGround && e.vy < 0 && !e.gliding && !e.inWater && !e.inWeb) e.vy -= 0.022;
-  if (!was && e.onGround && vy0 < -0.25 && !e.inWater) {
-    e._landT = tick; e._landK = clamp((-vy0 - 0.2) * 1.5, 0.2, 1);
+  if (!was && e.onGround && vy0 < -0.5 && !e.inWater) {            // real drops only: no dip for steps, slabs or small hops
+    e._landT = tick; e._landK = clamp((-vy0 - 0.4) * 1.3, 0.15, 1);
     if (e._landK > 0.35) sfx('step', e.x, e.y, e.z, 0.6 + e._landK);
   }
 };
