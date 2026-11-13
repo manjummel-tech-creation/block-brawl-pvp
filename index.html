@@ -8987,11 +8987,11 @@ updateModels = function (alpha) {
     if (!armBusy) { pr.armR.rotation.z -= sz; pr.armR.rotation.x += sx; }
     if (!m.shieldUp && m.using !== 'bow') { pr.armL.rotation.z += sz; pr.armL.rotation.x -= sx; }
 
-    // ---- 4) attack swing: the whole upper body twists into the hit ----
+    // ---- 4) attack swing: only the arm swings ----
     let twist = 0;
     if (m.swingT > 0 && !m.using) {
       const p = clamp(1 - (m.swingT - alpha) / 6, 0, 1);
-      twist = Math.sin(Math.sqrt(p) * Math.PI * 2) * 0.2;
+      twist = 0;   // arm-only swing: the torso, head and legs stay still
       const f = 1 - Math.pow(1 - p, 4), a = Math.sin(f * Math.PI), b = Math.sin(p * Math.PI) * -(pr.head.rotation.x - 0.7) * 0.75;
       pr.armR.rotation.x = armSw * 0.3 - (a * 1.2 + b);
       pr.armR.rotation.y = twist * 2;
@@ -9044,6 +9044,50 @@ updateCamera = function (alpha, dt) {
 (function () {
   const rows = MENU[2].rows, i = rows.findIndex(x => x[0] === 'fov');
   rows.splice(i + 1, 0, ['viewBob', 'View bobbing (camera sways as you walk)', 'tg']);
+})();
+buildMenu();
+
+// ================= HEAVIER CHARACTERS =================
+// Jumps reach the same height, but you come down faster (less floaty), and landings have weight:
+// the camera dips, the body sinks for a moment, and there's a thud that scales with how hard you landed.
+// Toggle: Settings -> "Heavy characters".
+if (CFG.heavy === undefined) CFG.heavy = true; DEF.heavy = true;
+const _physicsTickHeavy = physicsTick;
+physicsTick = function (e) {
+  const was = e.onGround, vy0 = e.vy;
+  _physicsTickHeavy(e);
+  if (!CFG.heavy || e.dead) return;
+  // extra pull only on the way down (never while gliding, swimming, webbed or stunned mid-combo launch)
+  if (!e.onGround && e.vy < 0 && !e.gliding && !e.inWater && !e.inWeb) e.vy -= 0.022;
+  if (!was && e.onGround && vy0 < -0.25 && !e.inWater) {
+    e._landT = tick; e._landK = clamp((-vy0 - 0.2) * 1.5, 0.2, 1);
+    if (e._landK > 0.35) sfx('step', e.x, e.y, e.z, 0.6 + e._landK);
+  }
+};
+const _updateCameraHeavy = updateCamera;
+updateCamera = function (alpha, dt) {
+  _updateCameraHeavy(alpha, dt);
+  const p = player;
+  if (!CFG.heavy || state !== 'play' || !p || p.dead || thirdPerson || p._landT === undefined || (typeof killcam !== 'undefined' && killcam) || (typeof RP !== 'undefined' && RP)) return;
+  const t = (tick - p._landT + alpha) / 7; if (t < 0 || t >= 1) return;
+  const dip = Math.sin(t * Math.PI) * (1 - t * 0.5) * 0.16 * p._landK;
+  camera.position.y -= dip; camera.rotation.x -= dip * 0.25;
+  const o = vmItem.visible ? vmItem : vmArm; o.position.y -= dip * 0.5;
+};
+const _updateModelsHeavy = updateModels;
+updateModels = function (alpha) {
+  _updateModelsHeavy(alpha);
+  for (const m of mobs) {
+    const pr = m.parts; if (!pr || !pr.body) continue;
+    let dip = 0;
+    if (CFG.heavy && !m.dead && m._landT !== undefined) { const t = (tick - m._landT + alpha) / 7; if (t >= 0 && t < 1) dip = Math.sin(t * Math.PI) * 0.1 * m._landK; }
+    pr.body.position.y = -dip;
+    if (dip > 0) { pr.legR.rotation.x += dip * 2.5; pr.legL.rotation.x -= dip * 2.5; }   // legs splay a little as they absorb the landing
+  }
+};
+(function () {
+  const rows = MENU[2].rows, i = rows.findIndex(x => x[0] === 'viewBob');
+  rows.splice(i + 1, 0, ['heavy', 'Heavy characters (fall faster, landings have weight)', 'tg']);
 })();
 buildMenu();
 // ================= SAVED SETTINGS FROM REMOVED MODES FALL BACK SAFELY =================
