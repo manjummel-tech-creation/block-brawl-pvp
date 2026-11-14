@@ -26,3 +26,19 @@ doHide = function (b, t, X) {
   }
   return r;
 };
+
+// ---- hiding is a SOMETIMES thing: ~30% of low-health moments, then a cool-down, so bots keep coming at you ----
+const _choosePlanSome = choosePlan;
+choosePlan = function (b, t, X) {
+  const p = _choosePlanSome(b, t, X);
+  if (p !== 'hide' || X.hide) return p;
+  if (tick < (X.noHideUntil || 0)) return 'flee';
+  if (tick > (X._hideRollT || 0)) { X._hideRollT = tick + 600; X._hideOK = Math.random() < 0.3; }     // one roll per 30 s, not one per decision
+  return X._hideOK ? p : 'flee';
+};
+const _botTickHideCool = botTick;
+botTick = function (b) {
+  const X = b.ai && b.ai.x, had = X && X.hide;
+  _botTickHideCool(b);
+  if (had && X && !X.hide) { X.noHideUntil = tick + 1800 + ((Math.random() * 1200) | 0); X._hideOK = false; }   // came back up: no hiding again for 1.5-2.5 min
+};
