@@ -2,7 +2,8 @@
 // A bot stuck in a cobweb no longer swings at the web. It turns to face the nearest enemy, then it can:
 //  - eat a golden apple to heal (if it is hurt; cancels if an enemy gets in its face)
 //  - hold its shield up facing the enemy
-//  - pour water on the web if it has a water bucket
+//  - pour water on the web if it has a water bucket (a HEAD web is watered out as soon as it reacts)
+//  - a head web it can't get out of within 3 s is cut out with the sword
 //  - and after about a second it starts dragging itself out, away from the enemy (roughly 2 s to leave a web), doing the rest while it moves
 // It will not hit anything while stuck (same as before) and webs it did not stand in are cut as usual.
 // Not used in the Mafia mode (guards there keep their own behaviour).
@@ -34,6 +35,30 @@ botTick = function (b) {
     holdSlot(b, g); b.using = 'eat'; b.useT = 0;
   }
   const eating = b.using === 'eat';
+  // ---- head web: water it out if there is a bucket; if it is still stuck after 3 s, cut it out with the sword ----
+  const sp = webSpots(b);
+  if (sp.head) {
+    const box = b.box(), hy = Math.floor(b.y + 0.01) + 1, full = slotWhere(b, it => it.k === 'bucket' && it.full);
+    if (full >= 0 && W.t >= W.react && tick >= (W.wCD || 0) && !eating) {
+      for (let x = Math.floor(box[0]); x <= Math.floor(box[3] - 0.001); x++) for (let z = Math.floor(box[2]); z <= Math.floor(box[5] - 0.001); z++) {
+        if (getB(x, hy, z) !== B.WEB) continue;
+        b.pitch = -80;                                                            // looks up at the web on its head
+        if (placeWater(x, hy, z)) { holdSlot(b, full); b.inv[full].full = false; setHeldVisual(b); swing(b); if (b.ai.x) b.ai.x.water = { x, y: hy, z, at: tick + 18 }; W.wCD = tick + 30; return; }
+      }
+    }
+    if (W.t > 60) {                                                                // 3 s and still stuck: cut it
+      let cell = null;
+      for (const yy of [hy, hy - 1]) for (let x = Math.floor(box[0]); x <= Math.floor(box[3] - 0.001) && !cell; x++) for (let z = Math.floor(box[2]); z <= Math.floor(box[5] - 0.001) && !cell; z++) if (getB(x, yy, z) === B.WEB) cell = { x, y: yy, z, id: B.WEB };
+      if (cell) {
+        if (b.using) { b.using = null; b.useT = 0; }
+        const swd = slotWhere(b, it => it.k === 'sword'); if (swd >= 0 && b.sel !== swd) holdSlot(b, swd);
+        lookAt(b, cell.x + 0.5, cell.y + 0.5, cell.z + 0.5, 60);
+        if (tick % 4 === 0) swing(b);
+        _tickMiningWebRules(b, cell);                                               // (skips the "can't cut your own head web" rule)
+        return;
+      }
+    }
+  }
   // ---- shield ----
   if (!eating && b.shield && tick >= (b.shieldCD || 0) && near && d < 7 && W.t >= 3) {
     if (b.ai.weaponSlot >= 0 && b.sel !== b.ai.weaponSlot) holdSlot(b, b.ai.weaponSlot);
