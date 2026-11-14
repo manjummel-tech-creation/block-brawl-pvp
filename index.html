@@ -9763,13 +9763,14 @@ function sqBus() {
   if (!SQ.out) {
     const c = a.createDynamicsCompressor(); c.threshold.value = -14; c.ratio.value = 3.5; c.attack.value = 0.003; c.release.value = 0.14; c.connect(a.destination); SQ.out = c;
     // short room echo: decaying noise, darker towards the end
-    const len = (SQ.sr * 0.9) | 0, ir = a.createBuffer(2, len, SQ.sr);
+    const len = (a.sampleRate * 0.9) | 0, ir = a.createBuffer(2, len, a.sampleRate);          // the reverb buffer must use the audio device's own sample rate (44.1k or 48k)
     for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); let lp = 0; for (let i = 0; i < len; i++) { const k = i / len; lp += ((Math.random() * 2 - 1) - lp) * (0.55 - 0.4 * k); d[i] = lp * Math.exp(-k * 7) * (i < 200 ? i / 200 : 1); } }
     const cv = a.createConvolver(); cv.buffer = ir; const sg = a.createGain(); sg.gain.value = 0.2; sg.connect(cv); cv.connect(c); SQ.send = sg;
   }
   return SQ.out;
 }
-function sqPlay(name, v) {
+function sqPlay(name, v) { try { sqPlay2(name, v); } catch (e) { if (!SQ.err) { SQ.err = 1; console.warn('sound error', e); } } }   // a sound problem must never stop the game
+function sqPlay2(name, v) {
   const a = ac(), out = sqBus(); if (!a || !out) return;
   v *= CFG.vol / 100; if (v < 0.004) return;
   const L = sqGet(name); if (!L) return;
@@ -9993,6 +9994,34 @@ G.startGame = startGame;
   for (const sec of MENU) { const i = sec.rows.findIndex(x => x[0] === 'map'); if (i >= 0) { sec.rows.splice(i + 1, 0, ['deepFloor', 'Deeper floor (24 more layers of ground to dig into)', 'tg']); break; } }
 })();
 buildMenu();
+// ================= BOTS USE THE DEEP FLOOR TO HIDE =================
+// With the deeper floor (YOFF layers below the old bottom) a bot that runs for cover with a pickaxe digs its staircase much
+// deeper: 10-18 blocks instead of 4-6 (never closer than 4 blocks to bedrock), then tunnels away, seals the path behind it,
+// heals in the dark and climbs back out. Better players dig deeper. Shallow maps (Sky Bridges, House) are unchanged.
+const _doHideDeep = doHide;
+doHide = function (b, t, X) {
+  const fresh = !X.hide;
+  // a deep bot climbs back out by digging straight up (the angled staircase out takes minutes from 15 blocks down)
+  const H0 = X.hide;
+  if (H0 && H0.phase === 'out' && typeof YOFF !== 'undefined' && YOFF > 0) {
+    H0.outT = (H0.outT || 0) + 1;
+    if (ffloor(b.y) < H0.surfY) { if (digUp(b, X, H0.surfY)) return true; }
+    if (H0.outT > 700 && ffloor(b.y) < H0.surfY) { X.hide = null; X.plan = 'fight'; X.planT = 40; return false; }   // still stuck down there: give up hiding
+  }
+  const r = _doHideDeep(b, t, X);
+  if (fresh && X.hide && typeof YOFF !== 'undefined' && YOFF > 0) {
+    const H = X.hide, room = Math.floor(b.y) + YOFF - 4;                    // blocks of solid ground left to dig through
+    // a staircase goes one block sideways per block down, so pick the direction with the most room (away from the enemy if it's a tie)
+    const fx = Math.floor(b.x), fz = Math.floor(b.z), runs = [[-1, 0, fx - 1], [1, 0, WX - 2 - fx], [0, -1, fz - 1], [0, 1, WZ - 2 - fz]];
+    const away = t ? Math.hypot(t.x - b.x, t.z - b.z) || 1 : 1;
+    let best = null, bs = -1e9;
+    for (const [sx, sz, run] of runs) { const sc = Math.min(run, 36) + (t ? -((t.x - b.x) * sx + (t.z - b.z) * sz) / away * 12 : 0); if (sc > bs) { bs = sc; best = [sx, sz, run]; } }
+    H.sx = best[0]; H.sz = best[1];
+    if (room > H.depth) H.depth = Math.max(H.depth, Math.min(room, best[2] - 4, 10 + ((Math.random() * 6) | 0) + Math.round((b.skill || 0.5) * 3)));
+    H.len = Math.max(0, Math.min(H.len, best[2] - H.depth - 3));            // keep the tunnel away from the world edge (brick wall: can't dig up there)
+  }
+  return r;
+};
 // ================= SAVED SETTINGS FROM REMOVED MODES FALL BACK SAFELY =================
 (function () {
   const modes = MENU[0].rows.find(x => x[0] === 'mode'), maps = MENU[0].rows.find(x => x[0] === 'map');

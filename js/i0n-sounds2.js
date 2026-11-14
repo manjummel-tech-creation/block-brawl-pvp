@@ -173,13 +173,14 @@ function sqBus() {
   if (!SQ.out) {
     const c = a.createDynamicsCompressor(); c.threshold.value = -14; c.ratio.value = 3.5; c.attack.value = 0.003; c.release.value = 0.14; c.connect(a.destination); SQ.out = c;
     // short room echo: decaying noise, darker towards the end
-    const len = (SQ.sr * 0.9) | 0, ir = a.createBuffer(2, len, SQ.sr);
+    const len = (a.sampleRate * 0.9) | 0, ir = a.createBuffer(2, len, a.sampleRate);          // the reverb buffer must use the audio device's own sample rate (44.1k or 48k)
     for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); let lp = 0; for (let i = 0; i < len; i++) { const k = i / len; lp += ((Math.random() * 2 - 1) - lp) * (0.55 - 0.4 * k); d[i] = lp * Math.exp(-k * 7) * (i < 200 ? i / 200 : 1); } }
     const cv = a.createConvolver(); cv.buffer = ir; const sg = a.createGain(); sg.gain.value = 0.2; sg.connect(cv); cv.connect(c); SQ.send = sg;
   }
   return SQ.out;
 }
-function sqPlay(name, v) {
+function sqPlay(name, v) { try { sqPlay2(name, v); } catch (e) { if (!SQ.err) { SQ.err = 1; console.warn('sound error', e); } } }   // a sound problem must never stop the game
+function sqPlay2(name, v) {
   const a = ac(), out = sqBus(); if (!a || !out) return;
   v *= CFG.vol / 100; if (v < 0.004) return;
   const L = sqGet(name); if (!L) return;
