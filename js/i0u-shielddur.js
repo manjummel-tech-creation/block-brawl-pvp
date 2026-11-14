@@ -17,6 +17,9 @@ hurt = function (t, amount, src) {
   const b0 = t.blocks || 0;
   const r = _hurtShieldDur(t, amount, src);
   if (r === false && (t.blocks || 0) > b0 && src && src.kind === 'melee' && t.shield && shieldDuelOn()) {
+    const key = (src.att ? src.att.id : -1) + ':' + tick;                     // one swing = one durability, however many times the hit code runs in that tick
+    if (t._shKey === key) return r;
+    t._shKey = key;
     const w = src.att && src.att.held;
     t.shieldHits = (t.shieldHits || 0) + (w && w.k === 'mace' ? 2 : 1);
     if (t.shieldHits >= SHIELD_HITS) breakShield(t, src.att);

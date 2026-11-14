@@ -23,6 +23,11 @@ drawHUD = function (al) {
     g.globalAlpha = d > 30 ? 0.65 : 1; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `bold ${size}px VT323, monospace`;
     g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(String(hp), sp.x, sp.y - 10);
     g.fillStyle = col; g.fillText(String(hp), sp.x, sp.y - 10);
+    // second line: how worn his gear is, so you can see it counts exactly like yours (armour pieces + hits to the next break, shield hits left in a duel)
+    const bits = [];
+    if (m.pieces) { const ev = m.armorEvery || 35; bits.push(`armour ${m.pieces.filter(Boolean).length}/4 (${ev - (m.armorHits || 0) % ev})`); }
+    if (m.shield && typeof shieldDuelOn === 'function' && shieldDuelOn()) bits.push(`shield ${Math.max(0, SHIELD_HITS - (m.shieldHits || 0))}/${SHIELD_HITS}`);
+    if (bits.length) { g.font = `${Math.max(13, size * 0.55) | 0}px VT323, monospace`; g.lineWidth = 4; g.strokeText(bits.join(' · '), sp.x, sp.y + 8); g.fillStyle = '#d8d8d8'; g.fillText(bits.join(' · '), sp.x, sp.y + 8); }
     g.globalAlpha = 1; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   }
 };
