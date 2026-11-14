@@ -1,6 +1,6 @@
 // ================= SHIELDS BREAK IN DUELS / 1v1 =================
 // In Duel 1v1 (and any moment when only two fighters are left alive) a shield can block 15 melee hits before it breaks for good:
-//   - each sword / axe / other melee hit it blocks costs 1 durability, a mace smash costs 5, arrows cost nothing
+//   - each sword / axe / other melee hit it blocks costs 1 durability, a mace smash costs 2, arrows cost nothing
 //   - at 15 it breaks: the shield is gone (you / the bot stop being able to block) until the next life
 //   - your own shield durability shows on the HUD next to the shield slot (e.g. 11/15)
 // With three or more fighters alive shields stay unbreakable (an axe still disables them for 5 s).
@@ -18,7 +18,7 @@ hurt = function (t, amount, src) {
   const r = _hurtShieldDur(t, amount, src);
   if (r === false && (t.blocks || 0) > b0 && src && src.kind === 'melee' && t.shield && shieldDuelOn()) {
     const w = src.att && src.att.held;
-    t.shieldHits = (t.shieldHits || 0) + (w && w.k === 'mace' ? 5 : 1);
+    t.shieldHits = (t.shieldHits || 0) + (w && w.k === 'mace' ? 2 : 1);
     if (t.shieldHits >= SHIELD_HITS) breakShield(t, src.att);
   }
   return r;

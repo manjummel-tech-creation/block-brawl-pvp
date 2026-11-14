@@ -2,7 +2,7 @@
 // A raised shield only covered the front, so a mace diver landing right on top of you (the usual way a smash arrives) counted as
 // "behind" the shield and went straight through. Now a smash from above is blocked while your shield is up and ready if the
 // diver is overhead (within 2.2 blocks sideways) or in front of you, for you and for bots. A smash that lands on a shield costs
-// it durability in duels (see i0u) and the diver is knocked back as for any blocked hit.
+// it 2 durability in duels (see i0u) and the diver is knocked back as for any blocked hit.
 let _blockAtt = null;
 const _frontalMace = frontal;
 frontal = function (t, sx, sz) {

@@ -10094,7 +10094,7 @@ botTick = function (b) {
 buildMenu();
 // ================= SHIELDS BREAK IN DUELS / 1v1 =================
 // In Duel 1v1 (and any moment when only two fighters are left alive) a shield can block 15 melee hits before it breaks for good:
-//   - each sword / axe / other melee hit it blocks costs 1 durability, a mace smash costs 5, arrows cost nothing
+//   - each sword / axe / other melee hit it blocks costs 1 durability, a mace smash costs 2, arrows cost nothing
 //   - at 15 it breaks: the shield is gone (you / the bot stop being able to block) until the next life
 //   - your own shield durability shows on the HUD next to the shield slot (e.g. 11/15)
 // With three or more fighters alive shields stay unbreakable (an axe still disables them for 5 s).
@@ -10112,7 +10112,7 @@ hurt = function (t, amount, src) {
   const r = _hurtShieldDur(t, amount, src);
   if (r === false && (t.blocks || 0) > b0 && src && src.kind === 'melee' && t.shield && shieldDuelOn()) {
     const w = src.att && src.att.held;
-    t.shieldHits = (t.shieldHits || 0) + (w && w.k === 'mace' ? 5 : 1);
+    t.shieldHits = (t.shieldHits || 0) + (w && w.k === 'mace' ? 2 : 1);
     if (t.shieldHits >= SHIELD_HITS) breakShield(t, src.att);
   }
   return r;
@@ -10165,7 +10165,7 @@ botTick = function (b) {
 // A raised shield only covered the front, so a mace diver landing right on top of you (the usual way a smash arrives) counted as
 // "behind" the shield and went straight through. Now a smash from above is blocked while your shield is up and ready if the
 // diver is overhead (within 2.2 blocks sideways) or in front of you, for you and for bots. A smash that lands on a shield costs
-// it durability in duels (see i0u) and the diver is knocked back as for any blocked hit.
+// it 2 durability in duels (see i0u) and the diver is knocked back as for any blocked hit.
 let _blockAtt = null;
 const _frontalMace = frontal;
 frontal = function (t, sx, sz) {
