@@ -9366,13 +9366,14 @@ startDash = function (p) {
 };
 (function () { const a = KB_ACTIONS.find(a => a[0] === 'dash'); if (a) a[1] = 'Dash (movement only, no damage)'; })();
 buildMenu();
-// ================= ENEMY HEARTS ONCE A FIGHT STARTS =================
-// Hit someone (or get hit by them) and their hearts float over their head for 15 s, refreshed by every hit.
+// ================= ENEMY HEALTH NUMBER ONCE YOU HIT THEM =================
+// Hit someone and their health floats over their head as a number for 15 s, refreshed by every hit of yours:
+// 20, 19, 18 ... 1 (each number is half a heart). Nothing shows when THEY hit YOU.
 const _dealDamageFoeHP = dealDamage;
 dealDamage = function (t, amt, src) {
   const r = _dealDamageFoeHP(t, amt, src);
   const a = src && src.att;
-  if (a && player && amt > 0) { if (a === player && t !== player) t._hpShow = tick + 300; else if (t === player && a !== player) a._hpShow = tick + 300; }
+  if (a === player && player && amt > 0 && t !== player) t._hpShow = tick + 300;
   return r;
 };
 const _drawHUDFoeHP = drawHUD;
@@ -9385,10 +9386,12 @@ drawHUD = function (al) {
     const q = m.parts.root.position, d = Math.hypot(q.x - cam.x, q.y - cam.y, q.z - cam.z); if (d > 48) continue;
     const sp = kcProject(q.x, q.y + 2.55, q.z); if (!sp || sp.x < -60 || sp.x > W + 60 || sp.y < -40 || sp.y > H + 40) continue;
     if (!set) { set = true; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.imageSmoothingEnabled = false; }
-    const s = d < 9 ? 2 : 1;
-    g.globalAlpha = d > 30 ? 0.65 : 1;
-    kcHeartRow(g, sp.x, sp.y - 8 * s, m.health, m.absorption, s, 10);
-    g.globalAlpha = 1;
+    const hp = Math.max(0, Math.ceil(m.health + m.absorption - 1e-6)), k = clamp(m.health / 20, 0, 1);
+    const col = m.absorption > 0 ? '#ffd23a' : k > 0.6 ? '#7dff6a' : k > 0.3 ? '#ffe45a' : '#ff5a5a', size = d < 9 ? 34 : d < 24 ? 26 : 20;
+    g.globalAlpha = d > 30 ? 0.65 : 1; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `bold ${size}px VT323, monospace`;
+    g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(String(hp), sp.x, sp.y - 10);
+    g.fillStyle = col; g.fillText(String(hp), sp.x, sp.y - 10);
+    g.globalAlpha = 1; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   }
 };
 const _startGameFoeHP = startGame;
@@ -9828,6 +9831,16 @@ setInterval(() => { if (!AC || !CFG.snd2 || !SQ.warm.length) return; for (let i 
   for (const sec of MENU) { const i = sec.rows.findIndex(x => x[0] === 'viewBob'); if (i >= 0) { sec.rows.splice(i, 0, ['snd2', 'New sounds (richer, per-block, left / right, echo)', 'tg']); break; } }
 })();
 buildMenu();
+// ================= ELYTRA: SOFTER LANDINGS =================
+// There is no separate speed-crash damage here, only fall damage (a steep dive keeps the fall counting). With an elytra
+// you land at speed, so a landing from a glide (or right after one) takes 30% of the normal fall damage, at most 3 hearts.
+const _physicsTickElyFall = physicsTick;
+physicsTick = function (e) { _physicsTickElyFall(e); if (e.gliding) e._glideSeen = tick; };
+const _hurtElyFall = hurt;
+hurt = function (t, amount, src) {
+  if (src && src.kind === 'fall' && (t.gliding || tick - (t._glideSeen === undefined ? -999 : t._glideSeen) < 20)) amount = Math.min(6, Math.ceil(amount * 0.3));
+  return _hurtElyFall(t, amount, src);
+};
 // ================= SAVED SETTINGS FROM REMOVED MODES FALL BACK SAFELY =================
 (function () {
   const modes = MENU[0].rows.find(x => x[0] === 'mode'), maps = MENU[0].rows.find(x => x[0] === 'map');
