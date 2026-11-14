@@ -585,7 +585,7 @@ function tryPlace(e) {
   const x = hit.x + hit.face[0], y = hit.y + hit.face[1], z = hit.z + hit.face[2];
   const cur = getB(x, y, z);
   if (cur === 255 || (cur && cur !== B.WATER)) return false;
-  if (y < 0 || y >= WY) return false;
+  if (y < -YOFF || y >= WY) return false;
   if (BL[it.id].solid) for (const m of mobs) { if (m.dead) continue; const b = m.box(); if (b[0] < x + 1 && b[3] > x && b[1] < y + 1 && b[4] > y && b[2] < z + 1 && b[5] > z) return false; }
   setB(x, y, z, it.id);
   it.n--; swing(e);

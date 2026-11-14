@@ -209,23 +209,24 @@ const isSolid = id => id === 255 || (id > 0 && BL[id].solid);
 const isOpaque = id => id > 0 && id !== 255 && BL[id].opaque;
 
 // ---------- world ----------
-let WX = 48, WY = 40, WZ = 48, world = new Uint8Array(WX * WY * WZ), VOID_Y = -30;
+// YOFF = extra layers BELOW y=0 (a deeper floor): y runs from -YOFF to WY-1, stored at index y + YOFF. NEXT_YOFF is what the next allocWorld uses.
+let WX = 48, WY = 40, WZ = 48, YOFF = 0, NEXT_YOFF = 0, world = new Uint8Array(WX * WY * WZ), VOID_Y = -30;
 let spawns = [];
 function getB(x, y, z) {
   x = Math.floor(x); y = Math.floor(y); z = Math.floor(z);
-  if (y < 0 || y >= WY) return 0;
+  if (y < -YOFF || y >= WY) return 0;
   if (x < 0 || z < 0 || x >= WX || z >= WZ) return 255;
-  return world[(y * WZ + z) * WX + x];
+  return world[((y + YOFF) * WZ + z) * WX + x];
 }
-function rawSet(x, y, z, id) { if (x < 0 || y < 0 || z < 0 || x >= WX || y >= WY || z >= WZ) return; world[(y * WZ + z) * WX + x] = id; }
+function rawSet(x, y, z, id) { if (x < 0 || y < -YOFF || z < 0 || x >= WX || y >= WY || z >= WZ) return; world[((y + YOFF) * WZ + z) * WX + x] = id; }
 function setB(x, y, z, id) {
-  if (x < 0 || y < 0 || z < 0 || x >= WX || y >= WY || z >= WZ) return false;
+  if (x < 0 || y < -YOFF || z < 0 || x >= WX || y >= WY || z >= WZ) return false;
   rawSet(x, y, z, id); markDirty(x, z);
   if ((x & 15) === 0) markDirty(x - 1, z); if ((x & 15) === 15) markDirty(x + 1, z);
   if ((z & 15) === 0) markDirty(x, z - 1); if ((z & 15) === 15) markDirty(x, z + 1);
   return true;
 }
-function topY(x, z) { for (let y = WY - 1; y >= 0; y--) { const b = getB(x, y, z); if (isSolid(b) || b === B.WATER) return y + 1; } return -1; }
+function topY(x, z) { for (let y = WY - 1; y >= -YOFF; y--) { const b = getB(x, y, z); if (isSolid(b) || b === B.WATER) return y + 1; } return -1; }
 
 // ---------- meshing ----------
 const FACES = [
@@ -275,8 +276,8 @@ function toGeo(g) {
 function buildChunk(ch) {
   const o = garr(), w = garr(), x2 = garr();
   const x0 = ch.cx * CS, z0 = ch.cz * CS;
-  for (let y = 0; y < WY; y++) for (let z = z0; z < Math.min(z0 + CS, WZ); z++) for (let x = x0; x < Math.min(x0 + CS, WX); x++) {
-    const id = world[(y * WZ + z) * WX + x]; if (!id) continue;
+  for (let y = -YOFF; y < WY; y++) for (let z = z0; z < Math.min(z0 + CS, WZ); z++) for (let x = x0; x < Math.min(x0 + CS, WX); x++) {
+    const id = world[((y + YOFF) * WZ + z) * WX + x]; if (!id) continue;
     const b = BL[id];
     if (b.cross) { crossQuads(x2, x, y, z, b.tiles[0]); continue; }
     if (b.liquid) {
@@ -314,7 +315,7 @@ function rebuildAll() {
 function updateChunks() { let n = 0; for (const ch of chunks) if (ch.dirty && n < 4) { buildChunk(ch); n++; } }
 
 // ---------- world generators ----------
-function allocWorld(x, y, z) { WX = x; WY = y; WZ = z; world = new Uint8Array(WX * WY * WZ); spawns = []; }
+function allocWorld(x, y, z) { WX = x; WY = y; WZ = z; YOFF = NEXT_YOFF; world = new Uint8Array(WX * (WY + YOFF) * WZ); spawns = []; }
 function tree(x, y, z) {
   for (let i = 0; i < 4; i++) rawSet(x, y + i, z, B.LOG);
   for (let dy = 2; dy <= 5; dy++) {

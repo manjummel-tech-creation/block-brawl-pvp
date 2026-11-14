@@ -6,7 +6,7 @@
 const RS = 13; // floats per mob per tick
 let REC = null, RP = null;
 function recStart() {
-  REC = { on: true, t0: tick, frames: [], world0: world.slice(), dims: [WX, WY, WZ], events: [], deaths: [], n: mobs.length };
+  REC = { on: true, t0: tick, frames: [], world0: world.slice(), dims: [WX, WY, WZ, YOFF], events: [], deaths: [], n: mobs.length };
 }
 const _startGameRec = startGame;
 startGame = function () { RP = null; $('#replayUI') && $('#replayUI').remove(); _startGameRec(); if (game) recStart(); };
@@ -55,7 +55,7 @@ function openReplay() {
   document.exitPointerLock && document.exitPointerLock();
   $('#end').classList.add('hidden'); $('#dead').classList.add('hidden'); $('#pause').classList.add('hidden');
   state = 'replay';
-  [WX, WY, WZ] = REC.dims; world = REC.world0.slice(); rebuildAll();
+  [WX, WY, WZ] = REC.dims; YOFF = REC.dims[3] || 0; world = REC.world0.slice(); rebuildAll();
   const pi = mobs.indexOf(player);
   RP = { t: 0, wf: 0, playing: true, speed: 1, cam: { mode: 'pov', idx: Math.max(0, pi) }, free: { x: WX / 2, y: WY * 0.6, z: WZ / 2, yaw: 0, pitch: 30 }, lastScrub: 0 };
   for (const m of mobs) { m._selKeep = m.sel; if (m.parts) m.parts.root.visible = true; }

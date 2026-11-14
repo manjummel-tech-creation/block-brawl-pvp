@@ -321,23 +321,24 @@ const isSolid = id => id === 255 || (id > 0 && BL[id].solid);
 const isOpaque = id => id > 0 && id !== 255 && BL[id].opaque;
 
 // ---------- world ----------
-let WX = 48, WY = 40, WZ = 48, world = new Uint8Array(WX * WY * WZ), VOID_Y = -30;
+// YOFF = extra layers BELOW y=0 (a deeper floor): y runs from -YOFF to WY-1, stored at index y + YOFF. NEXT_YOFF is what the next allocWorld uses.
+let WX = 48, WY = 40, WZ = 48, YOFF = 0, NEXT_YOFF = 0, world = new Uint8Array(WX * WY * WZ), VOID_Y = -30;
 let spawns = [];
 function getB(x, y, z) {
   x = Math.floor(x); y = Math.floor(y); z = Math.floor(z);
-  if (y < 0 || y >= WY) return 0;
+  if (y < -YOFF || y >= WY) return 0;
   if (x < 0 || z < 0 || x >= WX || z >= WZ) return 255;
-  return world[(y * WZ + z) * WX + x];
+  return world[((y + YOFF) * WZ + z) * WX + x];
 }
-function rawSet(x, y, z, id) { if (x < 0 || y < 0 || z < 0 || x >= WX || y >= WY || z >= WZ) return; world[(y * WZ + z) * WX + x] = id; }
+function rawSet(x, y, z, id) { if (x < 0 || y < -YOFF || z < 0 || x >= WX || y >= WY || z >= WZ) return; world[((y + YOFF) * WZ + z) * WX + x] = id; }
 function setB(x, y, z, id) {
-  if (x < 0 || y < 0 || z < 0 || x >= WX || y >= WY || z >= WZ) return false;
+  if (x < 0 || y < -YOFF || z < 0 || x >= WX || y >= WY || z >= WZ) return false;
   rawSet(x, y, z, id); markDirty(x, z);
   if ((x & 15) === 0) markDirty(x - 1, z); if ((x & 15) === 15) markDirty(x + 1, z);
   if ((z & 15) === 0) markDirty(x, z - 1); if ((z & 15) === 15) markDirty(x, z + 1);
   return true;
 }
-function topY(x, z) { for (let y = WY - 1; y >= 0; y--) { const b = getB(x, y, z); if (isSolid(b) || b === B.WATER) return y + 1; } return -1; }
+function topY(x, z) { for (let y = WY - 1; y >= -YOFF; y--) { const b = getB(x, y, z); if (isSolid(b) || b === B.WATER) return y + 1; } return -1; }
 
 // ---------- meshing ----------
 const FACES = [
@@ -387,8 +388,8 @@ function toGeo(g) {
 function buildChunk(ch) {
   const o = garr(), w = garr(), x2 = garr();
   const x0 = ch.cx * CS, z0 = ch.cz * CS;
-  for (let y = 0; y < WY; y++) for (let z = z0; z < Math.min(z0 + CS, WZ); z++) for (let x = x0; x < Math.min(x0 + CS, WX); x++) {
-    const id = world[(y * WZ + z) * WX + x]; if (!id) continue;
+  for (let y = -YOFF; y < WY; y++) for (let z = z0; z < Math.min(z0 + CS, WZ); z++) for (let x = x0; x < Math.min(x0 + CS, WX); x++) {
+    const id = world[((y + YOFF) * WZ + z) * WX + x]; if (!id) continue;
     const b = BL[id];
     if (b.cross) { crossQuads(x2, x, y, z, b.tiles[0]); continue; }
     if (b.liquid) {
@@ -426,7 +427,7 @@ function rebuildAll() {
 function updateChunks() { let n = 0; for (const ch of chunks) if (ch.dirty && n < 4) { buildChunk(ch); n++; } }
 
 // ---------- world generators ----------
-function allocWorld(x, y, z) { WX = x; WY = y; WZ = z; world = new Uint8Array(WX * WY * WZ); spawns = []; }
+function allocWorld(x, y, z) { WX = x; WY = y; WZ = z; YOFF = NEXT_YOFF; world = new Uint8Array(WX * (WY + YOFF) * WZ); spawns = []; }
 function tree(x, y, z) {
   for (let i = 0; i < 4; i++) rawSet(x, y + i, z, B.LOG);
   for (let dy = 2; dy <= 5; dy++) {
@@ -1124,7 +1125,7 @@ function tryPlace(e) {
   const x = hit.x + hit.face[0], y = hit.y + hit.face[1], z = hit.z + hit.face[2];
   const cur = getB(x, y, z);
   if (cur === 255 || (cur && cur !== B.WATER)) return false;
-  if (y < 0 || y >= WY) return false;
+  if (y < -YOFF || y >= WY) return false;
   if (BL[it.id].solid) for (const m of mobs) { if (m.dead) continue; const b = m.box(); if (b[0] < x + 1 && b[3] > x && b[1] < y + 1 && b[4] > y && b[2] < z + 1 && b[5] > z) return false; }
   setB(x, y, z, it.id);
   it.n--; swing(e);
@@ -2458,7 +2459,7 @@ function cellFreeOfMobs(x, y, z) {
 }
 function holdSlot(b, i) { if (i >= 0 && b.sel !== i) { b.sel = i; b.mineProg = 0; b.mineKey = null; setHeldVisual(b); } }
 function botPlace(b, x, y, z, web) {
-  if (y < 0 || y >= WY || b.useCD > 0) return false;
+  if (y < -YOFF || y >= WY || b.useCD > 0) return false;
   const cur = getB(x, y, z);
   if (cur !== 0 && !(cur === B.WATER && !web)) return false;
   if (!N6.some(([dx, dy, dz]) => isSolid(getB(x + dx, y + dy, z + dz)))) return false;
@@ -6147,7 +6148,7 @@ buildMenu();
 const RS = 13; // floats per mob per tick
 let REC = null, RP = null;
 function recStart() {
-  REC = { on: true, t0: tick, frames: [], world0: world.slice(), dims: [WX, WY, WZ], events: [], deaths: [], n: mobs.length };
+  REC = { on: true, t0: tick, frames: [], world0: world.slice(), dims: [WX, WY, WZ, YOFF], events: [], deaths: [], n: mobs.length };
 }
 const _startGameRec = startGame;
 startGame = function () { RP = null; $('#replayUI') && $('#replayUI').remove(); _startGameRec(); if (game) recStart(); };
@@ -6196,7 +6197,7 @@ function openReplay() {
   document.exitPointerLock && document.exitPointerLock();
   $('#end').classList.add('hidden'); $('#dead').classList.add('hidden'); $('#pause').classList.add('hidden');
   state = 'replay';
-  [WX, WY, WZ] = REC.dims; world = REC.world0.slice(); rebuildAll();
+  [WX, WY, WZ] = REC.dims; YOFF = REC.dims[3] || 0; world = REC.world0.slice(); rebuildAll();
   const pi = mobs.indexOf(player);
   RP = { t: 0, wf: 0, playing: true, speed: 1, cam: { mode: 'pov', idx: Math.max(0, pi) }, free: { x: WX / 2, y: WY * 0.6, z: WZ / 2, yaw: 0, pitch: 30 }, lastScrub: 0 };
   for (const m of mobs) { m._selKeep = m.sel; if (m.parts) m.parts.root.visible = true; }
@@ -6671,7 +6672,7 @@ function worldRLE() {
   return btoa(s);
 }
 function worldFromRLE(b64, dims) {
-  const s = atob(b64); [WX, WY, WZ] = dims; world = new Uint8Array(WX * WY * WZ);
+  const s = atob(b64); [WX, WY, WZ] = dims; YOFF = dims[3] || 0; world = new Uint8Array(WX * (WY + YOFF) * WZ);
   let p = 0; for (let k = 0; k < s.length; k += 2) { const v = s.charCodeAt(k), n = s.charCodeAt(k + 1); world.fill(v, p, p + n); p += n; }
 }
 
@@ -6720,7 +6721,7 @@ startGame = function () {
   const roster = mobs.map(m => ({ id: m.id, name: m.name, team: m.team, color: m.mats[1] ? m.mats[1].color.getHex() : 0x888888, teamCol: m.teamCol, hair: m.hair, eye: m.eye, armor: m.armorBase || m.armor, prot: m.prot, shield: !!m.shield }));
   for (const g of NET.guests) {
     for (let i = 0; i < parts; i++) netSend(g.conn, { t: 'w', i, n: parts, d: w.slice(i * 30000, (i + 1) * 30000) });
-    netSend(g.conn, { t: 'start', dims: [WX, WY, WZ], roster, you: g.mob.id, combat: CFG.combat, mode: CFG.mode, win: game.win, kt: game.killTarget, tick });
+    netSend(g.conn, { t: 'start', dims: [WX, WY, WZ, YOFF], roster, you: g.mob.id, combat: CFG.combat, mode: CFG.mode, win: game.win, kt: game.killTarget, tick });
   }
   NET.blockQ = []; NET.fxQ = [];
 };
@@ -9962,6 +9963,36 @@ botTick = function (b) {
     b.inWeb = false; try { move(b, Math.sin(ang) * 0.034, 0, Math.cos(ang) * 0.034); } finally { b.inWeb = true; }
   }
 };
+// ================= DEEPER FLOOR (duel maps + Mafia) =================
+// The ground used to be only 6-10 blocks thick, so digging down hit bedrock almost at once. Now the world reaches 24 layers
+// BELOW the old bottom: solid rock (or the map's own ground material) all the way down, bedrock only at the very bottom.
+// Everything built on top keeps its coordinates. Not used on Sky Bridges (void) or the Big House (indoors).
+// Settings -> "Deeper floor" switches it off for the next match.
+if (CFG.deepFloor === undefined) CFG.deepFloor = true; DEF.deepFloor = true;
+const DEEP = { D: 24, skip: ['bridges', 'house'] };
+function fillDeep() {
+  if (!YOFF) return;
+  for (let x = 0; x < WX; x++) for (let z = 0; z < WZ; z++) {
+    let f = getB(x, 1, z);                                          // continue the ground material downwards (sand, netherrack, stone...)
+    if (!f || f === 255 || !isSolid(f) || f === B.BEDROCK || f === B.WATER || f === B.LEAVES || f === B.LOG || f === B.PLANKS || f === B.GLASS) f = B.STONE;
+    for (let y = -YOFF + 1; y <= 0; y++) { if (y === 0 && getB(x, 0, z) !== B.BEDROCK) continue; rawSet(x, y, z, f); }   // the old bedrock floor becomes ordinary rock
+    rawSet(x, -YOFF, z, B.BEDROCK);
+  }
+}
+const _startGameDeep = startGame;
+startGame = function () {
+  const k = CFG.map;
+  if (!CFG.deepFloor || DEEP.skip.includes(k)) return _startGameDeep();
+  const keep = { a: genArena, p: genPlains, n: NEW_MAPS[k] };
+  const wrap = f => seed => { NEXT_YOFF = DEEP.D; try { f(seed); } finally { NEXT_YOFF = 0; } fillDeep(); };
+  if (NEW_MAPS[k]) NEW_MAPS[k] = wrap(NEW_MAPS[k]); else if (k === 'plains') genPlains = wrap(genPlains); else genArena = wrap(genArena);
+  try { _startGameDeep(); } finally { genArena = keep.a; genPlains = keep.p; if (keep.n) NEW_MAPS[k] = keep.n; }
+};
+G.startGame = startGame;
+(function () {
+  for (const sec of MENU) { const i = sec.rows.findIndex(x => x[0] === 'map'); if (i >= 0) { sec.rows.splice(i + 1, 0, ['deepFloor', 'Deeper floor (24 more layers of ground to dig into)', 'tg']); break; } }
+})();
+buildMenu();
 // ================= SAVED SETTINGS FROM REMOVED MODES FALL BACK SAFELY =================
 (function () {
   const modes = MENU[0].rows.find(x => x[0] === 'mode'), maps = MENU[0].rows.find(x => x[0] === 'map');

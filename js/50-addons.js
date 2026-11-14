@@ -243,7 +243,7 @@ function cellFreeOfMobs(x, y, z) {
 }
 function holdSlot(b, i) { if (i >= 0 && b.sel !== i) { b.sel = i; b.mineProg = 0; b.mineKey = null; setHeldVisual(b); } }
 function botPlace(b, x, y, z, web) {
-  if (y < 0 || y >= WY || b.useCD > 0) return false;
+  if (y < -YOFF || y >= WY || b.useCD > 0) return false;
   const cur = getB(x, y, z);
   if (cur !== 0 && !(cur === B.WATER && !web)) return false;
   if (!N6.some(([dx, dy, dz]) => isSolid(getB(x + dx, y + dy, z + dz)))) return false;

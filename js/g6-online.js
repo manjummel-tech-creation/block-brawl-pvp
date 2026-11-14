@@ -95,7 +95,7 @@ function worldRLE() {
   return btoa(s);
 }
 function worldFromRLE(b64, dims) {
-  const s = atob(b64); [WX, WY, WZ] = dims; world = new Uint8Array(WX * WY * WZ);
+  const s = atob(b64); [WX, WY, WZ] = dims; YOFF = dims[3] || 0; world = new Uint8Array(WX * (WY + YOFF) * WZ);
   let p = 0; for (let k = 0; k < s.length; k += 2) { const v = s.charCodeAt(k), n = s.charCodeAt(k + 1); world.fill(v, p, p + n); p += n; }
 }
 
@@ -144,7 +144,7 @@ startGame = function () {
   const roster = mobs.map(m => ({ id: m.id, name: m.name, team: m.team, color: m.mats[1] ? m.mats[1].color.getHex() : 0x888888, teamCol: m.teamCol, hair: m.hair, eye: m.eye, armor: m.armorBase || m.armor, prot: m.prot, shield: !!m.shield }));
   for (const g of NET.guests) {
     for (let i = 0; i < parts; i++) netSend(g.conn, { t: 'w', i, n: parts, d: w.slice(i * 30000, (i + 1) * 30000) });
-    netSend(g.conn, { t: 'start', dims: [WX, WY, WZ], roster, you: g.mob.id, combat: CFG.combat, mode: CFG.mode, win: game.win, kt: game.killTarget, tick });
+    netSend(g.conn, { t: 'start', dims: [WX, WY, WZ, YOFF], roster, you: g.mob.id, combat: CFG.combat, mode: CFG.mode, win: game.win, kt: game.killTarget, tick });
   }
   NET.blockQ = []; NET.fxQ = [];
 };
