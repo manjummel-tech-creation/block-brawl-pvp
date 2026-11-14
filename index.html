@@ -10203,6 +10203,24 @@ hurt = function (t, amount, src) {
   _blockAtt = src && src.att || null;
   try { return _hurtShieldMace(t, amount, src); } finally { _blockAtt = null; }
 };
+
+// ---- a BLOCKED smash is spent: one dive = one hit on the shield, never a smash through it ----
+// (Bots swing every tick of a dive while in reach. Each blocked swing cost the shield durability, so one dive broke the shield
+//  in 8 ticks, and the next swing then landed the full smash. Now the first blocked swing ends the smash: the diver's fall height
+//  is wiped, it can't smash again for 1.5 s, and its dive is over.)
+const _attackShieldMace = attack;
+attack = function (a, t, reach) {
+  const mace = a.held && a.held.k === 'mace';
+  if (mace && tick < (a._maceBlockT || 0)) return false;                         // spent: no more swings from this dive
+  const b0 = t.blocks || 0, air = !a.onGround;
+  const r = _attackShieldMace(a, t, reach);
+  if (!r && mace && air && (t.blocks || 0) > b0) {
+    a._maceBlockT = tick + 30; a.fallDistance = 0; a.apexY = a.y;
+    if (a._macePh) a._macePh = 'done';
+    if (a._elyDrop) a._elyDrop = false;
+  }
+  return r;
+};
 // ================= SAVED SETTINGS FROM REMOVED MODES FALL BACK SAFELY =================
 (function () {
   const modes = MENU[0].rows.find(x => x[0] === 'mode'), maps = MENU[0].rows.find(x => x[0] === 'map');
