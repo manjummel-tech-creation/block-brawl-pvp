@@ -9920,7 +9920,7 @@ buildMenu();
 //  - eat a golden apple to heal (if it is hurt; cancels if an enemy gets in its face)
 //  - hold its shield up facing the enemy
 //  - pour water on the web if it has a water bucket
-//  - and after a few seconds drag itself out slowly, away from the enemy (about 2-3 s to leave a web)
+//  - and after about a second it starts dragging itself out, away from the enemy (roughly 2 s to leave a web), doing the rest while it moves
 // It will not hit anything while stuck (same as before) and webs it did not stand in are cut as usual.
 // Not used in the Mafia mode (guards there keep their own behaviour).
 const _tickMiningOwnWeb = tickMining;
@@ -9931,7 +9931,7 @@ tickMining = function (e, hit) {
 const _botTickWebbed = botTick;
 botTick = function (b) {
   if (b.dead || !b.ai || !b.inWeb || !game || game.mafia || game.countdown > 0) { if (b._wb) { b._wb = null; if (b.using === 'eat' && !b.inWeb) { /* finish normally */ } } return _botTickWebbed(b); }
-  const sk = b.skill || 0.5, W = b._wb || (b._wb = { t: 0, react: 8 + ((Math.random() * 8) | 0), out: 45 + ((Math.random() * 35) | 0), eat: 0, dir: Math.random() * 6.283 });
+  const sk = b.skill || 0.5, W = b._wb || (b._wb = { t: 0, react: 5 + ((Math.random() * 6) | 0), out: 16 + ((Math.random() * 14) | 0), eat: 0, dir: Math.random() * 6.283 });
   W.t++;
   b.sprinting = false; b.sneaking = false; b.in = { f: 0, s: 0, jump: false };
   const { e: foe, d } = nearestEnemy(b);
@@ -9959,9 +9959,9 @@ botTick = function (b) {
   // ---- water bucket washes the web out ----
   if (!eating && CFG.botBuild && b.ai.x) botWater(b, b.ai.x);
   // ---- drag out, away from the enemy ----
-  if (!eating && W.t > W.out) {
+  if (W.t > W.out) {                                // keeps crawling out even while it eats or holds the shield up
     const ang = near ? Math.atan2(b.x - foe.x, b.z - foe.z) + (W.dir - 3.14) * 0.2 : W.dir;
-    b.inWeb = false; try { move(b, Math.sin(ang) * 0.034, 0, Math.cos(ang) * 0.034); } finally { b.inWeb = true; }
+    b.inWeb = false; try { move(b, Math.sin(ang) * 0.05, 0, Math.cos(ang) * 0.05); } finally { b.inWeb = true; }
   }
 };
 // ================= DEEPER FLOOR (duel maps + Mafia) =================
@@ -10131,6 +10131,35 @@ drawHUD = function (a) {
   g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(sx + gs, hy + hh - 3 * gs, hh - 2 * gs, 2 * gs);
   g.fillStyle = k > 0.5 ? '#7dff6a' : k > 0.25 ? '#ffe45a' : '#ff5a5a'; g.fillRect(sx + gs, hy + hh - 3 * gs, (hh - 2 * gs) * k, 2 * gs);
   txt(`${left}/${SHIELD_HITS}`, sx + hh / 2, hy - 14 * gs, 8 * gs, k > 0.25 ? '#ffffff' : '#ff8a8a', 'center');
+};
+// ================= BOTS DON'T STAND AROUND =================
+// Watchdog: a bot that has a target far away, is free to move and has not moved for 3 s (stuck on a corner, a bad plan, a
+// frozen decision) gets a short push: run toward the target (or sidestep around the thing in the way) and jump. Bots that are
+// busy (eating, drawing a bow, stunned, webbed, digging / building / hiding, in a mace or elytra move, dodging) are left alone,
+// and so are Mafia guards (they stand around on purpose).
+const _botTickNoStill = botTick;
+botTick = function (b) {
+  _botTickNoStill(b);
+  if (!b.ai || b.dead || b.isPlayer || !game || game.mafia || game.countdown > 0) return;
+  const X = b.ai.x, t = b.ai.t;
+  if (tick % 10 === 0) {
+    const L = b._nsPos;
+    if (!L || Math.hypot(b.x - L.x, b.z - L.z) > 0.35 || Math.abs(b.y - L.y) > 0.6) b._nsPos = { x: b.x, y: b.y, z: b.z, t: tick };
+  }
+  const busy = b.using || b.inWeb || b.stunT > tick || b.hitStun > 0 || b._ely || b._macePh || (b._dm && tick < b._dm.until) || b.shieldUp || (b.ai.mode && b.ai.mode !== 'fight') ||
+    !X || (X.plan !== 'fight' && X.plan !== 'flee' && X.plan !== 'seek' && X.plan !== 'kite') || X.hide || X.tower || X.dig;
+  if (busy || !t || t.dead) { if (!busy) return; b._nsPos = null; return; }
+  const L = b._nsPos; if (!L) return;
+  const d = Math.hypot(t.x - b.x, t.z - b.z);
+  if (tick - L.t >= 60 && d > 4) {                                   // 3 s without moving and nobody to fight: push
+    b._kick = { until: tick + 18, side: Math.random() < 0.5 ? -1 : 1, jump: tick + 4 }; L.t = tick; b.ai.state = 'approach'; b.ai.stateT = 20;
+  }
+  if (b._kick && tick < b._kick.until) {
+    const dx = t.x - b.x, dz = t.z - b.z, wantYaw = Math.atan2(-dx, dz) / DEG;
+    b.yaw += clamp(wrapDeg(wantYaw - b.yaw), -40, 40);
+    b.in = { f: 1, s: tick - b._kick.until < -9 ? b._kick.side * 0.6 : 0, jump: b.onGround && (b.hc || tick % 7 === 0) };
+    b.sprinting = true;
+  }
 };
 // ================= SAVED SETTINGS FROM REMOVED MODES FALL BACK SAFELY =================
 (function () {

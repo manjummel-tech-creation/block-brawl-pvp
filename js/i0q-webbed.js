@@ -3,7 +3,7 @@
 //  - eat a golden apple to heal (if it is hurt; cancels if an enemy gets in its face)
 //  - hold its shield up facing the enemy
 //  - pour water on the web if it has a water bucket
-//  - and after a few seconds drag itself out slowly, away from the enemy (about 2-3 s to leave a web)
+//  - and after about a second it starts dragging itself out, away from the enemy (roughly 2 s to leave a web), doing the rest while it moves
 // It will not hit anything while stuck (same as before) and webs it did not stand in are cut as usual.
 // Not used in the Mafia mode (guards there keep their own behaviour).
 const _tickMiningOwnWeb = tickMining;
@@ -14,7 +14,7 @@ tickMining = function (e, hit) {
 const _botTickWebbed = botTick;
 botTick = function (b) {
   if (b.dead || !b.ai || !b.inWeb || !game || game.mafia || game.countdown > 0) { if (b._wb) { b._wb = null; if (b.using === 'eat' && !b.inWeb) { /* finish normally */ } } return _botTickWebbed(b); }
-  const sk = b.skill || 0.5, W = b._wb || (b._wb = { t: 0, react: 8 + ((Math.random() * 8) | 0), out: 45 + ((Math.random() * 35) | 0), eat: 0, dir: Math.random() * 6.283 });
+  const sk = b.skill || 0.5, W = b._wb || (b._wb = { t: 0, react: 5 + ((Math.random() * 6) | 0), out: 16 + ((Math.random() * 14) | 0), eat: 0, dir: Math.random() * 6.283 });
   W.t++;
   b.sprinting = false; b.sneaking = false; b.in = { f: 0, s: 0, jump: false };
   const { e: foe, d } = nearestEnemy(b);
@@ -42,8 +42,8 @@ botTick = function (b) {
   // ---- water bucket washes the web out ----
   if (!eating && CFG.botBuild && b.ai.x) botWater(b, b.ai.x);
   // ---- drag out, away from the enemy ----
-  if (!eating && W.t > W.out) {
+  if (W.t > W.out) {                                // keeps crawling out even while it eats or holds the shield up
     const ang = near ? Math.atan2(b.x - foe.x, b.z - foe.z) + (W.dir - 3.14) * 0.2 : W.dir;
-    b.inWeb = false; try { move(b, Math.sin(ang) * 0.034, 0, Math.cos(ang) * 0.034); } finally { b.inWeb = true; }
+    b.inWeb = false; try { move(b, Math.sin(ang) * 0.05, 0, Math.cos(ang) * 0.05); } finally { b.inWeb = true; }
   }
 };
