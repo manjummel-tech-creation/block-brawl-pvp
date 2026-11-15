@@ -14,6 +14,12 @@ botTick = function (b) {
   }
   const busy = b.using || b.inWeb || b.stunT > tick || b.hitStun > 0 || b._ely || b._macePh || (b._dm && tick < b._dm.until) || b.shieldUp || (b.ai.mode && b.ai.mode !== 'fight') ||
     !X || (X.plan !== 'fight' && X.plan !== 'flee' && X.plan !== 'seek' && X.plan !== 'kite') || X.hide || X.tower || X.dig;
+  // long-stall failsafe: busy for ever (a stuck plan, a hide / tower / dig that went nowhere) but not moving for 20 s -> drop the plan, go fight
+  if (b._nsLong === undefined || Math.hypot(b.x - b._nsLong.x, b.z - b._nsLong.z) > 0.6 || Math.abs(b.y - b._nsLong.y) > 0.8 || b.inWeb || b.using === 'eat' || b.stunT > tick) b._nsLong = { x: b.x, y: b.y, z: b.z, t: tick };
+  else if (tick - b._nsLong.t > 400 && t && !t.dead && !(X && X.hide && X.hide.phase === 'wait' && tick - b._nsLong.t < 800)) {
+    b._nsLong.t = tick; if (X) { X.hide = null; X.tower = null; X.dig = null; X.seek = null; X.plan = 'seek'; X.seek = { t: 0 }; X.planT = 80; X.noHideUntil = tick + 600; }
+    b.ai.mode = 'fight'; b.ai.state = 'approach'; b._kick = { until: tick + 30, side: Math.random() < 0.5 ? -1 : 1, jump: tick + 4 };
+  }
   if (busy || !t || t.dead) { if (!busy) return; b._nsPos = null; return; }
   const L = b._nsPos; if (!L) return;
   const d = Math.hypot(t.x - b.x, t.z - b.z);
