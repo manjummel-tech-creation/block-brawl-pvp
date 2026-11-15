@@ -1,5 +1,5 @@
 // ================= WEBBED BOTS DON'T CUT THEMSELVES OUT =================
-// FAILSAFES: webbed again within 2 s of getting free = the new web is shrugged off at once; within 6 s = no reaction delay; stuck for 10 s = the webs around him are cut.
+// Last-resort failsafe only: still stuck after 15 s (nothing else worked) = the webs around him are cut. Otherwise webs are NEVER removed for him.
 // A bot stuck in a cobweb no longer swings at the web. It turns to face the nearest enemy, then it can:
 //  - eat a golden apple to heal (if it is hurt; cancels if an enemy gets in its face)
 //  - hold its shield up facing the enemy
@@ -16,14 +16,9 @@ tickMining = function (e, hit) {
 const _botTickWebbed = botTick;
 botTick = function (b) {
   if (b.dead || !b.ai || !b.inWeb || !game || game.mafia || game.countdown > 0) { if (b._wb) { b._wb = null; b._webFreeT = tick; } return _botTickWebbed(b); }
-  if (!b._wb && tick - (b._webFreeT || -999) < 40) {                      // webbed again within 2 s of getting free: he shrugs the new web off at once (no endless web-lock)
-    const bx = b.box(); for (let y = Math.floor(b.y + 0.01); y <= Math.floor(b.y + 0.01) + 1; y++) for (let x = Math.floor(bx[0]); x <= Math.floor(bx[3] - 0.001); x++) for (let z = Math.floor(bx[2]); z <= Math.floor(bx[5] - 0.001); z++) if (getB(x, y, z) === B.WEB) { setB(x, y, z, 0); burst(x + 0.5, y + 0.5, z + 0.5, 6, ['#ffffff', '#dddddd'], 1.5, 0.4, 0.06, 4); sfx('dig', x + 0.5, y + 0.5, z + 0.5); }
-    b.inWeb = false; b._webFreeT = tick; return _botTickWebbed(b);
-  }
-  const again = tick - (b._webFreeT || -999) < 120;                       // webbed again within 6 s of getting free: no thinking time, no waiting
-  const sk = b.skill || 0.5, W = b._wb || (b._wb = { t: again ? 60 : 0, react: again ? 0 : 5 + ((Math.random() * 6) | 0), out: again ? 0 : 16 + ((Math.random() * 14) | 0), eat: 0, dir: Math.random() * 6.283, born: tick });
+    const sk = b.skill || 0.5, W = b._wb || (b._wb = { t: 0, react: 5 + ((Math.random() * 6) | 0), out: 16 + ((Math.random() * 14) | 0), eat: 0, dir: Math.random() * 6.283, born: tick });
   W.t++;
-  if (tick - W.born > 200) {                                            // failsafe: nobody stays webbed for 10 s, whatever else is going on
+  if (tick - W.born > 300) {                                            // last-resort failsafe: nobody stays webbed for 15 s, whatever else is going on
     const bx = b.box(); for (let y = Math.floor(b.y + 0.01); y <= Math.floor(b.y + 0.01) + 1; y++) for (let x = Math.floor(bx[0]); x <= Math.floor(bx[3] - 0.001); x++) for (let z = Math.floor(bx[2]); z <= Math.floor(bx[5] - 0.001); z++) if (getB(x, y, z) === B.WEB) setB(x, y, z, 0);
     b.inWeb = false; b._wb = null; b._webFreeT = tick; return _botTickWebbed(b);
   }
