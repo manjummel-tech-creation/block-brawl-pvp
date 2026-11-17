@@ -17,15 +17,46 @@ const netSend = (c, o) => { try { if (c && c.open) c.send(o); } catch (e) {} };
 function netStatus(s) { NET.status = s; const el = $('#netStatus'); if (el) el.innerHTML = s; }
 function roomCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 5; i++) s += A[(Math.random() * A.length) | 0]; return s; }
 
+// Connection settings. Before, only one STUN server was used and nothing timed out, so on school/home networks
+// that block direct connections the guest sat on "Connecting…" forever. Now: several STUN servers plus free
+// TURN relays (they pass the game data along when a direct link is blocked), clear step-by-step status,
+// a 15 s timeout with an automatic retry, and auto-reconnect to the PeerJS server.
+const NET_OPTS = {
+  debug: 1,
+  config: {
+    iceServers: [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+      { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'],
+        username: 'openrelayproject', credential: 'openrelayproject' }
+    ]
+  }
+};
+const NET_ERR = {
+  'peer-unavailable': 'No room with that code (check it, and make sure the host still has the room open)',
+  'unavailable-id': 'Code taken, try again',
+  'network': 'Lost connection to the online server. Check your internet and try again',
+  'server-error': 'The online server is not responding. Try again in a minute',
+  'socket-error': 'Could not reach the online server (your network may block it)',
+  'socket-closed': 'Connection to the online server closed. Try again',
+  'browser-incompatible': 'This browser does not support online play. Try Chrome',
+  'webrtc': 'Your network blocked the connection to your friend'
+};
+const netErr = e => '⚠ ' + (NET_ERR[e && e.type] || (e && (e.type || e.message)) || e);
+function netKeepAlive(peer) { // the PeerJS server drops idle sockets: reconnect instead of going silent
+  peer.on('disconnected', () => { if (NET.peer === peer && !peer.destroyed) setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1000); });
+}
+
 // ---------- lobby ----------
 async function hostOnline() {
-  try { await loadPeer(); } catch (e) { netStatus('⚠ ' + e.message); return; }
+  try { await loadPeer(); } catch (e) { netStatus('⚠ ' + e.message + ' (check your internet)'); return; }
   netLeave(true);
   NET.code = roomCode(); NET.role = 'host';
   netStatus('Creating room…');
-  const peer = NET.peer = new Peer('mcc-' + NET.code);
-  peer.on('open', () => { netStatus(`Room code: <b style="color:#ffff70;font-size:30px">${NET.code}</b> — tell your friends to Join with it, then press PLAY.`); renderLobby(); });
-  peer.on('error', e => netStatus('⚠ ' + (e.type === 'unavailable-id' ? 'Code taken, try again' : e.type || e)));
+  const peer = NET.peer = new Peer('mcc-' + NET.code, NET_OPTS);
+  netKeepAlive(peer);
+  const slow = setTimeout(() => { if (NET.peer === peer && !peer.open) netStatus('⚠ Could not reach the online server. Your network may block it. Try another Wi-Fi or a phone hotspot.'); }, 15000);
+  peer.on('open', () => { clearTimeout(slow); netStatus(`Room code: <b style="color:#ffff70;font-size:30px">${NET.code}</b> — tell your friends to Join with it, then press PLAY.`); renderLobby(); });
+  peer.on('error', e => { if (e.type === 'unavailable-id') { clearTimeout(slow); return hostOnline(); } netStatus(netErr(e)); });
   peer.on('connection', conn => {
     conn.on('open', () => {
       if (NET.guests.length >= 4) { netSend(conn, { t: 'full' }); setTimeout(() => conn.close(), 300); return; }
@@ -33,20 +64,35 @@ async function hostOnline() {
       conn.on('data', d => onHostData(g, d));
       conn.on('close', () => { NET.guests = NET.guests.filter(x => x !== g); if (g.mob && !g.mob.dead && game && state === 'play') { feed(`${g.name} left`, '#ff9a5a'); die(g.mob, { kind: 'void' }); } renderLobby(); });
     });
+    conn.on('error', () => {});
   });
 }
-async function joinOnline(code) {
+async function joinOnline(code, retry) {
   code = (code || '').trim().toUpperCase(); if (!code) return;
-  try { await loadPeer(); } catch (e) { netStatus('⚠ ' + e.message); return; }
+  try { await loadPeer(); } catch (e) { netStatus('⚠ ' + e.message + ' (check your internet)'); return; }
   netLeave(true);
-  NET.role = 'client'; NET.code = code; netStatus('Connecting…');
-  const peer = NET.peer = new Peer();
-  peer.on('error', e => netStatus('⚠ ' + (e.type === 'peer-unavailable' ? 'No room with that code' : e.type || e)));
+  NET.role = 'client'; NET.code = code;
+  netStatus(retry ? 'Still trying… (attempt 2)' : 'Connecting to the online server…');
+  const peer = NET.peer = new Peer(NET_OPTS);
+  netKeepAlive(peer);
+  let joined = false;
+  const timer = setTimeout(() => {
+    if (NET.peer !== peer || joined) return;
+    if (!retry) return joinOnline(code, true);               // one automatic retry
+    netStatus(peer.open
+      ? '⚠ Found the server but could not reach the host. Make sure the host pressed "Host online game" and is still on the menu, then try again. School networks often block this: a phone hotspot usually works.'
+      : '⚠ Could not reach the online server. Your network may block it. Try another Wi-Fi or a phone hotspot.');
+    try { peer.destroy(); } catch (e) {}
+  }, 15000);
+  peer.on('error', e => { if (NET.peer !== peer) return; clearTimeout(timer); netStatus(netErr(e)); });
   peer.on('open', () => {
+    if (NET.peer !== peer) return;
+    netStatus(`Connected to the server, reaching room <b style="color:#ffff70">${code}</b>…`);
     const conn = NET.hostConn = peer.connect('mcc-' + code, { reliable: true });
-    conn.on('open', () => { netSend(conn, { t: 'hello', name: CFG.netName }); netStatus(`Joined room <b style="color:#ffff70">${code}</b> — waiting for the host to press PLAY…`); });
+    conn.on('open', () => { joined = true; clearTimeout(timer); netSend(conn, { t: 'hello', name: CFG.netName }); netStatus(`Joined room <b style="color:#ffff70">${code}</b> — waiting for the host to press PLAY…`); });
     conn.on('data', onClientData);
-    conn.on('close', () => { const wasPlaying = state === 'play'; netLeave(true); if (wasPlaying) { toMenu(); } netStatus('Disconnected from host.'); });
+    conn.on('error', e => { if (NET.peer === peer) netStatus(netErr(e)); });
+    conn.on('close', () => { if (NET.hostConn !== conn) return; const wasPlaying = state === 'play'; netLeave(true); if (wasPlaying) { toMenu(); } netStatus('Disconnected from host.'); });
   });
 }
 function netLeave(silent) {
