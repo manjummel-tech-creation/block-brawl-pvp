@@ -6594,15 +6594,46 @@ const netSend = (c, o) => { try { if (c && c.open) c.send(o); } catch (e) {} };
 function netStatus(s) { NET.status = s; const el = $('#netStatus'); if (el) el.innerHTML = s; }
 function roomCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 5; i++) s += A[(Math.random() * A.length) | 0]; return s; }
 
+// Connection settings. Before, only one STUN server was used and nothing timed out, so on school/home networks
+// that block direct connections the guest sat on "Connecting…" forever. Now: several STUN servers plus free
+// TURN relays (they pass the game data along when a direct link is blocked), clear step-by-step status,
+// a 15 s timeout with an automatic retry, and auto-reconnect to the PeerJS server.
+const NET_OPTS = {
+  debug: 1,
+  config: {
+    iceServers: [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+      { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'],
+        username: 'openrelayproject', credential: 'openrelayproject' }
+    ]
+  }
+};
+const NET_ERR = {
+  'peer-unavailable': 'No room with that code (check it, and make sure the host still has the room open)',
+  'unavailable-id': 'Code taken, try again',
+  'network': 'Lost connection to the online server. Check your internet and try again',
+  'server-error': 'The online server is not responding. Try again in a minute',
+  'socket-error': 'Could not reach the online server (your network may block it)',
+  'socket-closed': 'Connection to the online server closed. Try again',
+  'browser-incompatible': 'This browser does not support online play. Try Chrome',
+  'webrtc': 'Your network blocked the connection to your friend'
+};
+const netErr = e => '⚠ ' + (NET_ERR[e && e.type] || (e && (e.type || e.message)) || e);
+function netKeepAlive(peer) { // the PeerJS server drops idle sockets: reconnect instead of going silent
+  peer.on('disconnected', () => { if (NET.peer === peer && !peer.destroyed) setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1000); });
+}
+
 // ---------- lobby ----------
 async function hostOnline() {
-  try { await loadPeer(); } catch (e) { netStatus('⚠ ' + e.message); return; }
+  try { await loadPeer(); } catch (e) { netStatus('⚠ ' + e.message + ' (check your internet)'); return; }
   netLeave(true);
   NET.code = roomCode(); NET.role = 'host';
   netStatus('Creating room…');
-  const peer = NET.peer = new Peer('mcc-' + NET.code);
-  peer.on('open', () => { netStatus(`Room code: <b style="color:#ffff70;font-size:30px">${NET.code}</b> — tell your friends to Join with it, then press PLAY.`); renderLobby(); });
-  peer.on('error', e => netStatus('⚠ ' + (e.type === 'unavailable-id' ? 'Code taken, try again' : e.type || e)));
+  const peer = NET.peer = new Peer('mcc-' + NET.code, NET_OPTS);
+  netKeepAlive(peer);
+  const slow = setTimeout(() => { if (NET.peer === peer && !peer.open) netStatus('⚠ Could not reach the online server. Your network may block it. Try another Wi-Fi or a phone hotspot.'); }, 15000);
+  peer.on('open', () => { clearTimeout(slow); netStatus(`Room code: <b style="color:#ffff70;font-size:30px">${NET.code}</b> — tell your friends to Join with it, then press PLAY.`); renderLobby(); });
+  peer.on('error', e => { if (e.type === 'unavailable-id') { clearTimeout(slow); return hostOnline(); } netStatus(netErr(e)); });
   peer.on('connection', conn => {
     conn.on('open', () => {
       if (NET.guests.length >= 4) { netSend(conn, { t: 'full' }); setTimeout(() => conn.close(), 300); return; }
@@ -6610,20 +6641,35 @@ async function hostOnline() {
       conn.on('data', d => onHostData(g, d));
       conn.on('close', () => { NET.guests = NET.guests.filter(x => x !== g); if (g.mob && !g.mob.dead && game && state === 'play') { feed(`${g.name} left`, '#ff9a5a'); die(g.mob, { kind: 'void' }); } renderLobby(); });
     });
+    conn.on('error', () => {});
   });
 }
-async function joinOnline(code) {
+async function joinOnline(code, retry) {
   code = (code || '').trim().toUpperCase(); if (!code) return;
-  try { await loadPeer(); } catch (e) { netStatus('⚠ ' + e.message); return; }
+  try { await loadPeer(); } catch (e) { netStatus('⚠ ' + e.message + ' (check your internet)'); return; }
   netLeave(true);
-  NET.role = 'client'; NET.code = code; netStatus('Connecting…');
-  const peer = NET.peer = new Peer();
-  peer.on('error', e => netStatus('⚠ ' + (e.type === 'peer-unavailable' ? 'No room with that code' : e.type || e)));
+  NET.role = 'client'; NET.code = code;
+  netStatus(retry ? 'Still trying… (attempt 2)' : 'Connecting to the online server…');
+  const peer = NET.peer = new Peer(NET_OPTS);
+  netKeepAlive(peer);
+  let joined = false;
+  const timer = setTimeout(() => {
+    if (NET.peer !== peer || joined) return;
+    if (!retry) return joinOnline(code, true);               // one automatic retry
+    netStatus(peer.open
+      ? '⚠ Found the server but could not reach the host. Make sure the host pressed "Host online game" and is still on the menu, then try again. School networks often block this: a phone hotspot usually works.'
+      : '⚠ Could not reach the online server. Your network may block it. Try another Wi-Fi or a phone hotspot.');
+    try { peer.destroy(); } catch (e) {}
+  }, 15000);
+  peer.on('error', e => { if (NET.peer !== peer) return; clearTimeout(timer); netStatus(netErr(e)); });
   peer.on('open', () => {
+    if (NET.peer !== peer) return;
+    netStatus(`Connected to the server, reaching room <b style="color:#ffff70">${code}</b>…`);
     const conn = NET.hostConn = peer.connect('mcc-' + code, { reliable: true });
-    conn.on('open', () => { netSend(conn, { t: 'hello', name: CFG.netName }); netStatus(`Joined room <b style="color:#ffff70">${code}</b> — waiting for the host to press PLAY…`); });
+    conn.on('open', () => { joined = true; clearTimeout(timer); netSend(conn, { t: 'hello', name: CFG.netName }); netStatus(`Joined room <b style="color:#ffff70">${code}</b> — waiting for the host to press PLAY…`); });
     conn.on('data', onClientData);
-    conn.on('close', () => { const wasPlaying = state === 'play'; netLeave(true); if (wasPlaying) { toMenu(); } netStatus('Disconnected from host.'); });
+    conn.on('error', e => { if (NET.peer === peer) netStatus(netErr(e)); });
+    conn.on('close', () => { if (NET.hostConn !== conn) return; const wasPlaying = state === 'play'; netLeave(true); if (wasPlaying) { toMenu(); } netStatus('Disconnected from host.'); });
   });
 }
 function netLeave(silent) {
@@ -10397,6 +10443,65 @@ G.startGame = startGame;
   if (maps && !maps[3].some(o => o[0] === CFG.map)) CFG.map = 'arena';
   saveCfg(); buildMenu();
 })();
+// ================= NO HITS WHILE KNOCKED INTO THE AIR (MACE EXCEPTED) =================
+// If an opponent's hit knocks you up, you can't land a sword/axe/fist hit until you touch the ground again,
+// so you can't fight back mid-combo from the air. Normal jumps (crit hits) still work, and the mace always works.
+const _attackGroundOnly = attack;
+attack = function (a, t, reach) {
+  if (a._kbAirT && !a.onGround && !(a.held && a.held.k === 'mace')) return false;
+  const r = _attackGroundOnly(a, t, reach);
+  if (r && t && !t.dead && t._jrHitT !== tick) t._kbAirT = tick;   // knocked back (and no jump reset): mark them until they land
+  return r;
+};
+const _gameTickKbAir = gameTick;
+gameTick = function () {
+  _gameTickKbAir();
+  for (const m of mobs) if (m._kbAirT && (m.dead || m.inWater || (m.onGround && tick - m._kbAirT > 3))) m._kbAirT = 0;
+};
+
+// ================= BOTS CAN'T SPAM WATER BUCKETS =================
+// Every way a bot pours water (web clean-up, fall clutch, head-web fix...) shares one cooldown:
+// after pouring, a bot must wait 10 s before it can pour water again.
+const BOT_WATER_CD = 200;                                    // ticks (20 per second)
+let _waterBot = null;
+const _botTickWaterSpam = botTick;
+botTick = function (b) { _waterBot = b; try { return _botTickWaterSpam(b); } finally { _waterBot = null; } };
+const _placeWaterSpam = placeWater;
+placeWater = function (x, y, z) {
+  const b = _waterBot;
+  if (b && tick < (b._waterSpamCD || 0)) return false;
+  const r = _placeWaterSpam(x, y, z);
+  if (r && b) b._waterSpamCD = tick + BOT_WATER_CD;
+  return r;
+};
+// ================= JUMP RESETS THAT ACTUALLY WORK =================
+// Before, you had to press jump in a 0.1 s window AFTER the hit, which was almost impossible.
+// Now a jump reset counts if you jump up to 3 ticks BEFORE the hit (like real MC: jump as they swing)
+// or up to 4 ticks AFTER it. A jump reset cuts the hit's knockback and does NOT count as being
+// knocked into the air, so you can still hit back.
+const _doJumpJR = doJump;
+doJump = function (e) { _doJumpJR(e); e._jumpTick = tick; };
+const _knockbackJR = knockback;
+knockback = function (t, s, xr, zr) {
+  const early = !t.onGround && !t.inWater && !t.inWeb && tick - (t._jumpTick ?? -99) <= 3;
+  const vy0 = t.vy;
+  _knockbackJR(t, s, xr, zr);
+  if (early && !t.dead) {
+    t.vx *= 0.6; t.vz *= 0.6; t.vy = Math.max(t.vy, vy0);
+    t.jumpResetDone = true; t._jrHitT = tick; t._kbAirT = 0;
+    if (t === player) jumpResetT = performance.now();
+  }
+};
+const _tryJumpResetJR = tryJumpReset;
+tryJumpReset = function (e) {
+  const kt = e.kbTick, late = kt !== undefined && tick - kt > 2 && tick - kt <= 4;
+  if (late) e.kbTick = tick - 2;                            // widen the after-hit window to 4 ticks
+  const r = _tryJumpResetJR(e);
+  if (late) e.kbTick = kt;
+  if (r) { e._kbAirT = 0; e._jrHitT = tick; }
+  return r;
+};
+
 
 </script>
 </body></html>
