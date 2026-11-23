@@ -64,15 +64,19 @@ updateModels = function (alpha) {
       if (!m.shieldUp) pr.armL.rotation.x -= 0.1;
     } else pr.body.position.z = 0;
 
-    // ---- 6) elytra: the body lies flat along the flight, arms and legs trail ----
-    m._glideRot = lerp(m._glideRot || 0, m.gliding ? 1.3 + clamp(m.pitch, -60, 60) * DEG * 0.6 : 0, Math.min(1, dt * 10));
+    // ---- 6) elytra / rockets: the body lies flat along the flight (never upright, even when climbing), arms and legs trail ----
+    // Lying angle: 90 deg = flat. Looking up only lifts the head end a little (min ~75 deg); diving tips it head-down.
+    const glideTarget = m.gliding ? clamp(Math.PI / 2 + clamp(m.pitch, -90, 90) * DEG * 0.5, 1.3, 2.3) : 0;
+    m._glideRot = lerp(m._glideRot || 0, glideTarget, Math.min(1, dt * 10));
     if (m._glideRot > 0.02) {
       const g = m._glideRot, k = Math.min(1, g);
       pr.body.rotation.x += g; pr.head.rotation.x -= g * 0.75;
+      // the model pivots at the feet: slide it back and lift it so the lying body sits inside the hitbox, not in front of it
+      m._glideLift = 0.45 * (1 - Math.cos(g)); pr.body.position.z = -0.9 * Math.sin(g); pr.body.position.y = m._glideLift;
       pr.legR.rotation.x *= 1 - k; pr.legL.rotation.x *= 1 - k;
       if (!armBusy) { pr.armR.rotation.x *= 1 - k; pr.armR.rotation.z = -0.12 * k; }
       pr.armL.rotation.x *= 1 - k; pr.armL.rotation.z = 0.12 * k;
-    }
+    } else { m._glideLift = 0; pr.body.position.y = 0; }
 
     if (pr.shieldPivot) pr.shieldPivot.rotation.x = -pr.armL.rotation.x;
   }
@@ -135,7 +139,7 @@ updateModels = function (alpha) {
     const pr = m.parts; if (!pr || !pr.body) continue;
     let dip = 0;
     if (CFG.heavy && !m.dead && m._landT !== undefined) { const t = (tick - m._landT + alpha) / 7; if (t >= 0 && t < 1) dip = Math.sin(t * Math.PI) * 0.1 * m._landK; }
-    pr.body.position.y = -dip;
+    pr.body.position.y = (m._glideLift || 0) - dip;       // keep the glide lift
     if (dip > 0) { pr.legR.rotation.x += dip * 2.5; pr.legL.rotation.x -= dip * 2.5; }   // legs splay a little as they absorb the landing
   }
 };

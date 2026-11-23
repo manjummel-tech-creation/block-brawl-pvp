@@ -235,7 +235,7 @@ centerMsg = function (b, s) { _centerNet(b, s); if (NET.role === 'host' && NET.g
 function hostBroadcast() {
   if (NET.role !== 'host' || !NET.guests.length || !game) return;
   const M = mobs.map(m => {
-    const fl = (m.dead ? 1 : 0) | (m.sneaking ? 2 : 0) | (m.shieldUp ? 4 : 0) | (m.using === 'bow' ? 8 : 0) | (m.using === 'eat' ? 16 : 0) | (m.using === 'block' ? 32 : 0) | (m.shield ? 64 : 0) | (m.onGround ? 128 : 0) | (m.hurtTime > 0 ? 256 : 0);
+    const fl = (m.dead ? 1 : 0) | (m.sneaking ? 2 : 0) | (m.shieldUp ? 4 : 0) | (m.using === 'bow' ? 8 : 0) | (m.using === 'eat' ? 16 : 0) | (m.using === 'block' ? 32 : 0) | (m.shield ? 64 : 0) | (m.onGround ? 128 : 0) | (m.hurtTime > 0 ? 256 : 0) | (m.gliding ? 512 : 0) | (hasElytra(m) ? 1024 : 0);
     return [m.id, +m.x.toFixed(3), +m.y.toFixed(3), +m.z.toFixed(3), +m.yaw.toFixed(1), +m.pitch.toFixed(1), fl, m.swingT, m.hurtTime, itemKey(m.held), +(m.health + m.absorption).toFixed(1), m.using === 'bow' ? m.useT : 0];
   });
   const proj = [];
@@ -326,7 +326,7 @@ function clientSnap(d) {
     m.x = r[1]; m.y = r[2]; m.z = r[3];
     if (m !== player) { m.yaw = r[4]; m.pitch = r[5]; }
     const fl = r[6], wasDead = m.dead;
-    m.dead = !!(fl & 1); m.sneaking = !!(fl & 2); m.shieldUp = !!(fl & 4); m.shield = !!(fl & 64); m.onGround = !!(fl & 128);
+    m.dead = !!(fl & 1); m.sneaking = !!(fl & 2); m.shieldUp = !!(fl & 4); m.shield = !!(fl & 64); m.onGround = !!(fl & 128); m.gliding = !!(fl & 512); m._netEly = !!(fl & 1024);
     m.using = fl & 8 ? 'bow' : fl & 16 ? 'eat' : fl & 32 ? 'block' : null; m.useT = r[11] || 0;
     m.swingT = r[7]; m.hurtTime = r[8];
     if (m !== player) { const it = parseItemKey(r[9]); m.inv[0] = it; m.sel = 0; }
@@ -420,3 +420,7 @@ openReplay = function () { if (NET.role === 'client') return; _openReplayNet(); 
 const _dieNetKC = die;
 die = function (t, src) { _dieNetKC(t, src); if (NET.role === 'client') killcam = null; };
 buildMenu();
+
+// guests only see other players' held item, so the host tells them who wears an elytra (wings show and open while gliding)
+const _hasElytraNet = hasElytra;
+hasElytra = function (m) { return !!(game && game.client && m && m._netEly) || _hasElytraNet(m); };
