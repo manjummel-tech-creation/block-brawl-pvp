@@ -6812,7 +6812,7 @@ centerMsg = function (b, s) { _centerNet(b, s); if (NET.role === 'host' && NET.g
 function hostBroadcast() {
   if (NET.role !== 'host' || !NET.guests.length || !game) return;
   const M = mobs.map(m => {
-    const fl = (m.dead ? 1 : 0) | (m.sneaking ? 2 : 0) | (m.shieldUp ? 4 : 0) | (m.using === 'bow' ? 8 : 0) | (m.using === 'eat' ? 16 : 0) | (m.using === 'block' ? 32 : 0) | (m.shield ? 64 : 0) | (m.onGround ? 128 : 0) | (m.hurtTime > 0 ? 256 : 0);
+    const fl = (m.dead ? 1 : 0) | (m.sneaking ? 2 : 0) | (m.shieldUp ? 4 : 0) | (m.using === 'bow' ? 8 : 0) | (m.using === 'eat' ? 16 : 0) | (m.using === 'block' ? 32 : 0) | (m.shield ? 64 : 0) | (m.onGround ? 128 : 0) | (m.hurtTime > 0 ? 256 : 0) | (m.gliding ? 512 : 0) | (hasElytra(m) ? 1024 : 0);
     return [m.id, +m.x.toFixed(3), +m.y.toFixed(3), +m.z.toFixed(3), +m.yaw.toFixed(1), +m.pitch.toFixed(1), fl, m.swingT, m.hurtTime, itemKey(m.held), +(m.health + m.absorption).toFixed(1), m.using === 'bow' ? m.useT : 0];
   });
   const proj = [];
@@ -6903,7 +6903,7 @@ function clientSnap(d) {
     m.x = r[1]; m.y = r[2]; m.z = r[3];
     if (m !== player) { m.yaw = r[4]; m.pitch = r[5]; }
     const fl = r[6], wasDead = m.dead;
-    m.dead = !!(fl & 1); m.sneaking = !!(fl & 2); m.shieldUp = !!(fl & 4); m.shield = !!(fl & 64); m.onGround = !!(fl & 128);
+    m.dead = !!(fl & 1); m.sneaking = !!(fl & 2); m.shieldUp = !!(fl & 4); m.shield = !!(fl & 64); m.onGround = !!(fl & 128); m.gliding = !!(fl & 512); m._netEly = !!(fl & 1024);
     m.using = fl & 8 ? 'bow' : fl & 16 ? 'eat' : fl & 32 ? 'block' : null; m.useT = r[11] || 0;
     m.swingT = r[7]; m.hurtTime = r[8];
     if (m !== player) { const it = parseItemKey(r[9]); m.inv[0] = it; m.sel = 0; }
@@ -6997,6 +6997,10 @@ openReplay = function () { if (NET.role === 'client') return; _openReplayNet(); 
 const _dieNetKC = die;
 die = function (t, src) { _dieNetKC(t, src); if (NET.role === 'client') killcam = null; };
 buildMenu();
+
+// guests only see other players' held item, so the host tells them who wears an elytra (wings show and open while gliding)
+const _hasElytraNet = hasElytra;
+hasElytra = function (m) { return !!(game && game.client && m && m._netEly) || _hasElytraNet(m); };
 // ================= KILL-CAM RULES vs MULTIPLE OPPONENTS =================
 // With several opponents the kill-cam no longer interrupts every kill. It plays:
 //  - when your kill finishes off the LAST opponent (match won) — from that victim's eyes
@@ -9059,15 +9063,19 @@ updateModels = function (alpha) {
       if (!m.shieldUp) pr.armL.rotation.x -= 0.1;
     } else pr.body.position.z = 0;
 
-    // ---- 6) elytra: the body lies flat along the flight, arms and legs trail ----
-    m._glideRot = lerp(m._glideRot || 0, m.gliding ? 1.3 + clamp(m.pitch, -60, 60) * DEG * 0.6 : 0, Math.min(1, dt * 10));
+    // ---- 6) elytra / rockets: the body lies flat along the flight (never upright, even when climbing), arms and legs trail ----
+    // Lying angle: 90 deg = flat. Looking up only lifts the head end a little (min ~75 deg); diving tips it head-down.
+    const glideTarget = m.gliding ? clamp(Math.PI / 2 + clamp(m.pitch, -90, 90) * DEG * 0.5, 1.3, 2.3) : 0;
+    m._glideRot = lerp(m._glideRot || 0, glideTarget, Math.min(1, dt * 10));
     if (m._glideRot > 0.02) {
       const g = m._glideRot, k = Math.min(1, g);
       pr.body.rotation.x += g; pr.head.rotation.x -= g * 0.75;
+      // the model pivots at the feet: slide it back and lift it so the lying body sits inside the hitbox, not in front of it
+      m._glideLift = 0.45 * (1 - Math.cos(g)); pr.body.position.z = -0.9 * Math.sin(g); pr.body.position.y = m._glideLift;
       pr.legR.rotation.x *= 1 - k; pr.legL.rotation.x *= 1 - k;
       if (!armBusy) { pr.armR.rotation.x *= 1 - k; pr.armR.rotation.z = -0.12 * k; }
       pr.armL.rotation.x *= 1 - k; pr.armL.rotation.z = 0.12 * k;
-    }
+    } else { m._glideLift = 0; pr.body.position.y = 0; }
 
     if (pr.shieldPivot) pr.shieldPivot.rotation.x = -pr.armL.rotation.x;
   }
@@ -9130,7 +9138,7 @@ updateModels = function (alpha) {
     const pr = m.parts; if (!pr || !pr.body) continue;
     let dip = 0;
     if (CFG.heavy && !m.dead && m._landT !== undefined) { const t = (tick - m._landT + alpha) / 7; if (t >= 0 && t < 1) dip = Math.sin(t * Math.PI) * 0.1 * m._landK; }
-    pr.body.position.y = -dip;
+    pr.body.position.y = (m._glideLift || 0) - dip;       // keep the glide lift
     if (dip > 0) { pr.legR.rotation.x += dip * 2.5; pr.legL.rotation.x -= dip * 2.5; }   // legs splay a little as they absorb the landing
   }
 };
