@@ -113,7 +113,7 @@ drawHUD = function (a) {
 };
 (function () {
   const row = (sec, after, r) => { const rows = MENU[sec].rows, i = rows.findIndex(x => x[0] === after); rows.splice(i + 1, 0, r); };
-  row(1, 'gapples', ['pots', 'Splash healing potions (press Y — heals 5 hearts)', 'rng', [0, 16, 1]]);
+  row(1, 'gapples', ['pots', 'Splash healing potions (press Y to throw where you look — look down to self-pot, heals 5 hearts)', 'rng', [0, 16, 1]]);
   row(2, 'botGapples', ['botPots', 'Bot healing potions', 'rng', [0, 16, 1]]);
 })();
 buildMenu();

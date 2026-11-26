@@ -80,7 +80,7 @@ drawHUD = function (a) {
     // timer bar under the crosshair
     const bw = 60 * gs / 2, bx = W / 2 - bw / 2, by = H / 2 + 26 * gs / 2 + 30;
     g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(bx - 2, by - 2, bw + 4, 8);
-    g.fillStyle = '#ff6a3a'; g.fillRect(bx, by, bw * left / 200, 4);
+    g.fillStyle = '#ff6a3a'; g.fillRect(bx, by, bw * Math.min(1, left / 300), 4);
     txt(`STRENGTH  ${(left / 20).toFixed(1)}s`, W / 2, by - 6, 18, '#ffb070', 'center');
   }
   const since = performance.now() - strFlashT;
@@ -94,7 +94,7 @@ updateCamera = function (alpha, dt) {
 };
 (function () {
   const row = (sec, after, r) => { const rows = MENU[sec].rows, i = rows.findIndex(x => x[0] === after); rows.splice(i + 1, 0, r); };
-  row(1, 'pots', ['strPots', 'Strength potions (press U — x1.4 damage for 10 s)', 'rng', [0, 8, 1]]);
+  row(1, 'pots', ['strPots', 'Strength splash potions (press U to throw where you look — x1.4 damage for 15 s)', 'rng', [0, 8, 1]]);
   row(2, 'botPots', ['botStrPots', 'Bot strength potions', 'rng', [0, 8, 1]]);
 })();
 buildMenu();

@@ -97,7 +97,8 @@ const effIcon = (fill, rows) => pxArt(px => rows.forEach((r, y) => [...r].forEac
 const EFF = {
   strength: { col: '#c0302a', ic: effIcon('#e04a3a', ['..XX....', '.XooX...', 'XooooX..', '.XoooXX.', '..XooooX', '...XooX.', '....XX..']) },
   regen: { col: '#e06aa0', ic: effIcon('#ff7ab8', ['.XX.XX..', 'XooXooX.', 'XoooooX.', '.XoooX..', '..XoX...', '...X....']) },
-  absorb: { col: '#f2c624', ic: effIcon('#f2c624', ['.XX.XX..', 'XooXooX.', 'XoooooX.', '.XoooX..', '..XoX...', '...X....']) }
+  absorb: { col: '#f2c624', ic: effIcon('#f2c624', ['.XX.XX..', 'XooXooX.', 'XoooooX.', '.XoooX..', '..XoX...', '...X....']) },
+  fireres: { col: '#f08a20', ic: effIcon('#f08a20', ['...X....', '..XoX...', '.XoooX..', '.XooooX.', 'XooXooX.', 'XooooooX', '.XXXXXX.']) }
 };
 const _drawHUDClip = drawHUD;
 drawHUD = function (a) {
@@ -108,6 +109,7 @@ drawHUD = function (a) {
   if (str > 0) list.push(['strength', str]);
   if (p.regenFx > 0) list.push(['regen', p.regenFx]);
   if (p.absorption > 0) list.push(['absorb', p.totemAbsUntil ? p.totemAbsUntil - tick : -1]);
+  if ((p.fireResUntil || 0) > tick) list.push(['fireres', p.fireResUntil - tick]);
   const g = hctx, S = 44;
   list.forEach(([k, left], i) => {
     const x = W - 12 - (i + 1) * (S + 6), y = 210;

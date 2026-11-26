@@ -90,7 +90,7 @@ drawHUD = function (a) {
   _drawHUDArmor(a);
   if (state !== 'play' || !player || player.dead) return;
   if (performance.now() - armorBreakT < 1500) txt(armorBreakTxt, W / 2, H / 2 - 150, 30, '#ff9a5a', 'center');
-  if (player.pieces) { // durability: hits until the next piece breaks
+  if (player.pieces && !window.ARMOR_SIDE_HUD) { // durability: hits until the next piece breaks
     const left = (player.armorEvery || 35) - (player.armorHits % (player.armorEvery || 35)), n = player.pieces.filter(Boolean).length;
     if (n > 0) {
       const gs = clamp(Math.floor(Math.min(W / 300, H / 230)), 2, 4), hw = 182 * gs, hh = 22 * gs, hx = Math.round((W - hw) / 2), hy = H - hh - 4;

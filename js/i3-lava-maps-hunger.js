@@ -962,6 +962,7 @@ function giveDrop(m, it) {
   if (it.k === '_arrows') { m.arrows = (m.arrows || 0) + it.n; return true; }
   if (it.k === '_pots') { m.pots = (m.pots || 0) + it.n; return true; }
   if (it.k === '_str') { m.strPots = (m.strPots || 0) + it.n; return true; }
+  if (it.k === '_totem' && m.itemTotems) { for (let i = 0; i < it.n; i++) giveLoot(m, { k: 'totem' }); return true; }
   if (it.k === '_totem') { m.totems = (m.totems || 0) + it.n; if (typeof drawTag === 'function') drawTag(m); return true; }
   if (it.n !== undefined) { const s = m.inv.find(o => o && o.k === it.k && (it.k !== 'block' || o.id === it.id) && o.n !== undefined); if (s) { s.n += it.n; return true; } }
   const k = m.inv.findIndex(o => !o || (o.n !== undefined && o.n <= 0)); if (k < 0) return false;
@@ -974,7 +975,7 @@ die = function (t, src) {
   if (!t.dead || t._dropT === tick || (typeof NET !== 'undefined' && NET.role === 'client')) return;
   t._dropT = tick;
   const x = t.x, y = t.y + 0.8, z = t.z;
-  for (const it of t.inv) {
+  for (const it of [...t.inv, ...(t.bag || []), ...(t.offArr || [])]) {
     if (!it || (it.n !== undefined && it.n <= 0)) continue;
     const c = JSON.parse(JSON.stringify(it)); if (c.k === 'bucketHidden') c.k = 'bucket';
     spawnDrop(c, x, y, z);
@@ -982,7 +983,7 @@ die = function (t, src) {
   if (t.arrows > 0) spawnDrop({ k: '_arrows', n: t.arrows }, x, y, z);
   if (t.pots > 0) spawnDrop({ k: '_pots', n: t.pots }, x, y, z);
   if (t.strPots > 0) spawnDrop({ k: '_str', n: t.strPots }, x, y, z);
-  if (t.totems > 0) spawnDrop({ k: '_totem', n: t.totems }, x, y, z);
+  if (t.totems > 0 && !t.itemTotems) spawnDrop({ k: '_totem', n: t.totems }, x, y, z);
 };
 const _gameTickDrops = gameTick;
 gameTick = function () {
