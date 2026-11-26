@@ -1,5 +1,4 @@
 
-
 // ================= MC-STYLE PVP: splash potions you aim, fire resistance, offhand (§), totems in hand, PvP kit, armour HUD =================
 // - Splash potions are real items. Right-click (or Y / U) throws one where you look, 20 degrees above your aim like
 //   MC, so to self-pot you look down. Healing, Strength (now 15 s) and the new Fire Resistance (45 s).
@@ -104,6 +103,8 @@ tickPots = function () {
   for (let i = potProj.length - 1; i >= 0; i--) if (potProj[i].dead) { scene.remove(potProj[i].mesh); potProj.splice(i, 1); }
 };
 // fire resistance: no fire, lava or magma damage while it lasts
+const _gameTickFireRes = gameTick;
+gameTick = function () { _gameTickFireRes(); for (const m of mobs) if ((m.fireResUntil || 0) > tick && m.fireT > 0) { m.fireT = 0; m.fireBy = null; } };
 const _hurtFireRes = hurt;
 hurt = function (t, amount, src) {
   if (src && (src.kind === 'lava' || src.kind === 'fire' || src.kind === 'magma') && (t.fireResUntil || 0) > tick) return false;
@@ -331,5 +332,4 @@ drawHUD = function (a) {
   const fr = (p.fireResUntil || 0) - tick;
   const since = performance.now() - fireResFlashT;
   if (since < 500) { g.fillStyle = `rgba(255,150,40,${0.3 * (1 - since / 500)})`; g.fillRect(0, 0, W, H); txt('FIRE RESISTANCE', W / 2, H / 2 - 120, 34, '#ffb040', 'center'); }
-  if (fr > 0 && (p.fireT > 0 || p.inLava)) txt('fire resistance: no fire damage', W / 2, H - 170, 16, '#ffc060', 'center');
 };

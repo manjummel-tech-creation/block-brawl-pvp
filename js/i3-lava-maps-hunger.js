@@ -47,7 +47,7 @@ gameTick = function () {
 const _drawHUDLava = drawHUD;
 drawHUD = function (alpha) {
   _drawHUDLava(alpha);
-  const burning = state === 'play' && game && player && !player.dead && (player.fireT > 0 || player.inLava) && !paused;
+  const burning = state === 'play' && game && player && !player.dead && (player.fireT > 0 || player.inLava) && !paused && !((player.fireResUntil || 0) > tick);
   if (window._fireCv && (!burning || thirdPerson)) window._fireCv.style.display = 'none';
   if (!burning) return;
   if (thirdPerson) return;
@@ -288,7 +288,7 @@ updateCamera = function (alpha, dt) {
   if (state !== 'play' || !game) return;
   const cp = camera.getWorldPosition(new THREE.Vector3());
   for (const m of mobs) {
-    if (m.dead || !(m.fireT > 0 || m.inLava)) continue;
+    if (m.dead || !(m.fireT > 0 || m.inLava) || (m.fireResUntil || 0) > tick) continue;
     if (m === player && !thirdPerson) continue;                      // first person uses the screen flames
     const fx = fireSprites(m), x = m.px + (m.x - m.px) * alpha, y = m.py + (m.y - m.py) * alpha, z = m.pz + (m.z - m.pz) * alpha;
     // push the side flames left / right of the body as seen from the camera, the big one slightly in front
@@ -311,7 +311,7 @@ gameTick = function () {
   const t0 = tick; _gameTickFireFx();
   if (tick === t0 || !game) return;
   for (const m of mobs) {
-    if (m.dead || !(m.fireT > 0 || m.inLava) || (m === player && !thirdPerson)) continue;
+    if (m.dead || !(m.fireT > 0 || m.inLava) || (m === player && !thirdPerson) || (m.fireResUntil || 0) > tick) continue;
     if (tick % 3 === 0) spawnP(m.x + (Math.random() - 0.5) * 0.5, m.y + 1.6 + Math.random() * 0.4, m.z + (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.3, 1.2 + Math.random(), (Math.random() - 0.5) * 0.3,
       ['#3a3a3a', '#555555', '#6a6a6a'][(Math.random() * 3) | 0], 0.7 + Math.random() * 0.5, 0.12 + Math.random() * 0.08, -1.5);   // smoke
     if (tick % 4 === 1) spawnP(m.x + (Math.random() - 0.5) * 0.4, m.y + 0.6 + Math.random() * 1.2, m.z + (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 1.2, 2 + Math.random() * 1.5, (Math.random() - 0.5) * 1.2,

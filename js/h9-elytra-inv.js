@@ -217,7 +217,7 @@ gameTick = function () {
   const p = player;
   for (let i = 0; i < 9; i++) {
     const it = live(p.inv[i]), prev = _hbPrev[i];
-    if (!it && prev) {
+    if (!it && prev && !/^(splash|totem):/.test(prev)) {             // potions / totems are one-use: no auto-refill
       const j = p.bag.findIndex(s => live(s) && kindKey(s) === prev);
       if (j >= 0) { p.inv[i] = p.bag[j]; p.bag[j] = null; if (i === p.sel) setHeldVisual(p); }
     }
