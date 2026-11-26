@@ -7,11 +7,12 @@ A Minecraft-style PvP combat game that runs in your browser. Fight smart bots or
 ## Features
 
 - **Minecraft-accurate movement and combat:** 20-tick physics, sprinting and jump-resets, 1.9+ attack cooldown (or 1.8 spam mode), crits and crit streaks, sword sweeps, armour and Protection, shields and axes, i-frames.
-- **Weapons and items:** swords, axes, a Thor's-hammer mace (stun or bounce, lightning on smash), bows, wind charges, cobwebs, water buckets, golden apples, splash healing and strength potions, totems of undying, and a dash/lunge.
+- **Weapons and items:** swords, axes, a heavy Thor's-hammer mace (stun or bounce, lightning, screen-shaking smash), bows, wind charges, cobwebs, water and lava buckets (water only refills from a source; lava sets people on fire), golden apples, splash healing and strength potions, totems of undying, and a dash/lunge.
+- **Survival rules like Minecraft:** hunger (sprinting and fighting drain food, regen needs 9 shanks), fire ticks, suffocation, vanilla fall damage, falling sand, and everyone drops their items on the ground when they die.
 - **Smart bots:** pick the type and difficulty of each bot (Beginner → Godlike). Bots strafe and dodge, W-tap, block with shields, web-trap you, wind-charge + mace combo, bridge, pillar, tunnel, hide to heal, and make human mistakes.
 - **Online multiplayer:** host a room, share the 5-letter code, and play with up to 4 friends (peer-to-peer, no server needed). The host picks the mode, map and knockback for the party.
 - **Choose your knockback:** from very low to full vanilla, in the Match settings or the online party settings.
-- **Modes and maps:** Duel, Free-for-all, Team fight or Juggernaut (you vs an army), with kit modes (Sword, Cobweb, Mace, Axe & Shield, Pot PvP, UHC, Full SMP, Custom). Maps: Big Biome World, Big House (fight indoors), Arena, Sky Bridges, Sunflower Plains, Cave, Nether, Snowy Peaks, Desert Canyon.
+- **Modes and maps:** Duel, Free-for-all, Team fight or Juggernaut (you vs an army), with kit modes (Sword, Cobweb, Mace, Axe & Shield, Pot PvP, UHC, Full SMP, Custom). Maps: Big Biome World, Big House (fight indoors), Arena, Sky Bridges, Sunflower Plains, Cave, plus huge realistic maps: The Nether (lava sea, all five biomes, a fortress with bridges), The End (floating island, obsidian pillars with exploding end crystals, outer islands), Forest, Swamp, Snowy Peaks and Desert Canyon.
 - **Elytra, firework rockets and ender pearls**, a 27-slot backpack (press E) that remembers your layout between games.
 - **Kill-cam and full match replays:** scrub the timeline, change speed, and watch from anyone's eyes or with a free camera.
 - **Fully rebindable controls.**

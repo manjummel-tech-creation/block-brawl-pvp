@@ -67,7 +67,12 @@ input[type=range]{width:100%;accent-color:#5aa03a;height:22px}
 #tinfo .bar div.ab{background:#f2c200}
 #lockhint{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);font-size:24px;background:rgba(0,0,0,.6);padding:4px 12px;z-index:5;pointer-events:none}
 @media (max-width:600px){.title{font-size:54px}.title span{font-size:32px}}
-</style></head>
+</style><style>
+#menu #playbar{position:sticky;bottom:-120px;z-index:20;flex-shrink:0;align-self:stretch;display:flex;justify-content:center;margin:14px -16px 0;padding:16px 16px 22px;
+  background:linear-gradient(to top,rgba(3,7,18,.96) 62%,rgba(3,7,18,0));pointer-events:none}
+#menu #playbar #play{position:static!important;transform:none!important;margin:0!important;flex-shrink:0;line-height:1.2;pointer-events:auto}
+</style>
+</head>
 <body>
 <canvas id="gl"></canvas>
 <canvas id="hud"></canvas>
@@ -78,7 +83,7 @@ input[type=range]{width:100%;accent-color:#5aa03a;height:22px}
   <div class="title">BLOCK BRAWL<span>PvP!</span></div>
   <div class="sub">Minecraft-style combat vs smart bots · real knockback, i-frames, crits &amp; cooldowns</div>
   <div id="cols"></div>
-  <button id="play" class="mc big">PLAY</button>
+  <div id="playbar"><button id="play" class="mc big">PLAY</button></div>
   <div class="help">WASD move · Space jump · Ctrl sprint (or double-tap W) · Shift sneak · Left click attack / mine · Right click bow / eat / place / sword-block (1.8)<br>1–9 or mouse wheel hotbar · V or F5 camera · F3 debug · B hitboxes · Tab scoreboard · Esc pause<br>Every control can be rebound in the Controls panel.</div>
 </div>
 <div id="pause" class="scr hidden">
