@@ -105,17 +105,21 @@ attack = function (a, t, reach) {
 
 // ---------- 6. water bucket ----------
 const waterFlows = new Map();
+const flowCells = new Set(); // cells holding spread-out (flowing) water: these can't be scooped up, only the source can
+const isWaterSource = (x, y, z) => getB(x, y, z) === B.WATER && !flowCells.has(x + ',' + y + ',' + z);
 function placeWater(x, y, z) {
   const c = getB(x, y, z);
   if (c === 255 || (c && c !== B.WEB && c !== B.WATER)) return false;
   setB(x, y, z, B.WATER);
+  flowCells.delete(x + ',' + y + ',' + z); // this cell is now a source
   const flows = [];
+  const addFlow = (a, b, c) => { setB(a, b, c, B.WATER); flows.push([a, b, c]); flowCells.add(a + ',' + b + ',' + c); };
   let yy = y - 1;
-  for (let n = 0; n < 12 && yy >= 0; n++, yy--) { const id = getB(x, yy, z); if (id === 0 || id === B.WEB) { setB(x, yy, z, B.WATER); flows.push([x, yy, z]); } else break; }
+  for (let n = 0; n < 12 && yy >= 0; n++, yy--) { const id = getB(x, yy, z); if (id === 0 || id === B.WEB) addFlow(x, yy, z); else break; }
   const by = yy + 1;
   for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
     const id = getB(x + dx, by, z + dz);
-    if ((id === 0 || id === B.WEB) && isSolid(getB(x + dx, by - 1, z + dz))) { setB(x + dx, by, z + dz, B.WATER); flows.push([x + dx, by, z + dz]); }
+    if ((id === 0 || id === B.WEB) && isSolid(getB(x + dx, by - 1, z + dz))) addFlow(x + dx, by, z + dz);
     if (getB(x + dx, y, z + dz) === B.WEB) setB(x + dx, y, z + dz, 0); // water washes nearby webs away
   }
   waterFlows.set(x + ',' + y + ',' + z, flows);
@@ -124,36 +128,107 @@ function placeWater(x, y, z) {
   return true;
 }
 function pickupWater(x, y, z) {
-  if (getB(x, y, z) !== B.WATER) return false;
+  if (!isWaterSource(x, y, z)) return false; // flowing water can't fill a bucket
   setB(x, y, z, 0);
   const k = x + ',' + y + ',' + z, flows = waterFlows.get(k);
-  if (flows) for (const [a, b, c] of flows) if (getB(a, b, c) === B.WATER) setB(a, b, c, 0);
+  if (flows) for (const [a, b, c] of flows) { const fk = a + ',' + b + ',' + c; if (flowCells.has(fk)) { flowCells.delete(fk); if (getB(a, b, c) === B.WATER) setB(a, b, c, 0); } }
   waterFlows.delete(k);
   sfx('splash', x + 0.5, y + 0.5, z + 0.5, 0.6);
   return true;
 }
+// ---------- 6b. lava bucket ----------
+// Pour lava like water (short column down + a little spread). Standing in it burns hard and sets you on fire.
+// Only the block you poured is a source: scooping it back up takes all its flowing lava with it.
+B.LAVA = 34;
+defB(34, 'Lava', [39, 39, 39], -1, null, { solid: false, opaque: false, liquid: true, drop: 0, color: '#ff6a10' });
+const lavaFlows = new Map();      // source key -> flowing cells
+const lavaFlowCells = new Set();  // cells holding flowing lava
+const lavaOwner = new Map();      // cell key -> who poured it (kill credit)
+const isLavaSource = (x, y, z) => getB(x, y, z) === B.LAVA && !lavaFlowCells.has(x + ',' + y + ',' + z);
+function forgetLava(k) { lavaFlowCells.delete(k); lavaOwner.delete(k); }
+// lava touching water hardens: a source turns to obsidian, flowing lava to cobblestone
+function quenchLava() {
+  const touchesWater = (x, y, z) => [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(([a, b, c]) => getB(x + a, y + b, z + c) === B.WATER);
+  for (const [sk, flows] of lavaFlows) {
+    for (const [x, y, z] of flows) if (getB(x, y, z) === B.LAVA && touchesWater(x, y, z)) { setB(x, y, z, B.COBBLE); forgetLava(x + ',' + y + ',' + z); sfx('splash', x + 0.5, y + 0.5, z + 0.5, 0.4); burst(x + 0.5, y + 1, z + 0.5, 8, ['#dddddd', '#aaaaaa'], 1.2, 0.8, 0.1, -2); }
+    const [x, y, z] = sk.split(',').map(Number);
+    if (getB(x, y, z) === B.LAVA && touchesWater(x, y, z)) { setB(x, y, z, B.OBSIDIAN); forgetLava(sk); lavaFlows.delete(sk); sfx('splash', x + 0.5, y + 0.5, z + 0.5, 0.5); burst(x + 0.5, y + 1, z + 0.5, 10, ['#dddddd', '#aaaaaa'], 1.2, 0.8, 0.1, -2); }
+  }
+}
+function placeLava(x, y, z, owner) {
+  const c = getB(x, y, z);
+  if (c === 255 || (c && c !== B.WEB && c !== B.LAVA && c !== B.WATER)) return false;
+  if (c === B.WATER) { // lava straight into water: instant cobblestone
+    setB(x, y, z, B.COBBLE); flowCells.delete(x + ',' + y + ',' + z); sfx('splash', x + 0.5, y + 0.5, z + 0.5, 0.5);
+    burst(x + 0.5, y + 1, z + 0.5, 10, ['#dddddd', '#aaaaaa'], 1.2, 0.8, 0.1, -2); return true;
+  }
+  const key = (a, b, c) => a + ',' + b + ',' + c;
+  setB(x, y, z, B.LAVA); lavaFlowCells.delete(key(x, y, z)); lavaOwner.set(key(x, y, z), owner || null);
+  const flows = [];
+  const addFlow = (a, b, c) => { setB(a, b, c, B.LAVA); flows.push([a, b, c]); lavaFlowCells.add(key(a, b, c)); lavaOwner.set(key(a, b, c), owner || null); };
+  let yy = y - 1;
+  for (let n = 0; n < 12 && yy >= -YOFF; n++, yy--) { const id = getB(x, yy, z); if (id === 0 || id === B.WEB) addFlow(x, yy, z); else break; }
+  const by = yy + 1;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const id = getB(x + dx, by, z + dz);
+    if ((id === 0 || id === B.WEB) && isSolid(getB(x + dx, by - 1, z + dz))) addFlow(x + dx, by, z + dz);
+  }
+  lavaFlows.set(key(x, y, z), flows);
+  sfx('splash', x + 0.5, y + 0.5, z + 0.5, 0.5);
+  burst(x + 0.5, y + 0.8, z + 0.5, 14, ['#ff6a10', '#ffb030', '#ffe070'], 2, 0.6, 0.08, 6);
+  quenchLava();
+  return true;
+}
+function pickupLava(x, y, z) {
+  if (!isLavaSource(x, y, z)) return false; // flowing lava can't be scooped
+  const k = x + ',' + y + ',' + z, flows = lavaFlows.get(k);
+  setB(x, y, z, 0); forgetLava(k);
+  if (flows) for (const [a, b, c] of flows) { const fk = a + ',' + b + ',' + c; if (lavaFlowCells.has(fk)) { forgetLava(fk); if (getB(a, b, c) === B.LAVA) setB(a, b, c, 0); } }
+  lavaFlows.delete(k);
+  sfx('splash', x + 0.5, y + 0.5, z + 0.5, 0.5);
+  return true;
+}
+// water poured onto lava hardens it; water flowing next to lava does too
+const _placeWaterLava = placeWater;
+placeWater = function (x, y, z) {
+  if (getB(x, y, z) === B.LAVA) {
+    const src = isLavaSource(x, y, z), k = x + ',' + y + ',' + z;
+    setB(x, y, z, src ? B.OBSIDIAN : B.COBBLE); forgetLava(k); if (src) lavaFlows.delete(k);
+    sfx('splash', x + 0.5, y + 0.5, z + 0.5); burst(x + 0.5, y + 1, z + 0.5, 12, ['#dddddd', '#aaaaaa'], 1.4, 0.8, 0.1, -2);
+    return true;
+  }
+  const r = _placeWaterLava(x, y, z);
+  if (r) quenchLava();
+  return r;
+};
 function rayAny(e, maxD, want) { // step the look ray and return the first cell matching want(id)
   const d = e.look(); let px = NaN, py = NaN, pz = NaN;
   for (let t = 0; t <= maxD; t += 0.05) {
     const x = Math.floor(e.x + d[0] * t), y = Math.floor(e.y + e.eyeH + d[1] * t), z = Math.floor(e.z + d[2] * t);
     if (x === px && y === py && z === pz) continue;
     const id = getB(x, y, z);
-    if (want(id)) return { x, y, z, prev: [px, py, pz] };
+    if (want(id, x, y, z)) return { x, y, z, prev: [px, py, pz] };
     if (isSolid(id)) return null;
     px = x; py = y; pz = z;
   }
   return null;
 }
 function useBucket(e) {
-  const it = e.held; if (!it || it.k !== 'bucket') return false;
+  const it = e.held; if (!it || (it.k !== 'bucket' && it.k !== 'lavaBucket')) return false;
+  if (it.k === 'lavaBucket') {
+    const d = e.look(), h = rayBlocks(e.x, e.y + e.eyeH, e.z, d[0], d[1], d[2], 4.5);
+    if (h && isSolid(h.id) && placeLava(h.x + h.face[0], h.y + h.face[1], h.z + h.face[2], e)) { it.k = 'bucket'; it.full = false; swing(e); setHeldVisual(e); return true; }
+    return false;
+  }
   if (it.full) {
     const web = rayAny(e, 4.5, id => id === B.WEB);
     if (web && placeWater(web.x, web.y, web.z)) { it.full = false; swing(e); setHeldVisual(e); return true; }
     const d = e.look(), h = rayBlocks(e.x, e.y + e.eyeH, e.z, d[0], d[1], d[2], 4.5);
     if (h && isSolid(h.id) && placeWater(h.x + h.face[0], h.y + h.face[1], h.z + h.face[2])) { it.full = false; swing(e); setHeldVisual(e); return true; }
   } else {
-    const w = rayAny(e, 4.5, id => id === B.WATER);
-    if (w && pickupWater(w.x, w.y, w.z)) { it.full = true; swing(e); setHeldVisual(e); return true; }
+    const w = rayAny(e, 4.5, (id, x, y, z) => (id === B.WATER && !flowCells.has(x + ',' + y + ',' + z)) || (id === B.LAVA && isLavaSource(x, y, z)));
+    if (w && getB(w.x, w.y, w.z) === B.LAVA) { if (pickupLava(w.x, w.y, w.z)) { it.k = 'lavaBucket'; delete it.full; swing(e); setHeldVisual(e); return true; } }
+    else if (w && pickupWater(w.x, w.y, w.z)) { it.full = true; swing(e); setHeldVisual(e); return true; }
   }
   return false;
 }
@@ -165,13 +240,20 @@ const bucketIcon = full => pxArt(px => {
   }
 });
 ICON.bucketFull = bucketIcon(true); ICON.bucketEmpty = bucketIcon(false);
+ICON.bucketLava = pxArt(px => {
+  line(px, 3, 6, 5, 2, '#5a5a5a'); line(px, 5, 2, 10, 2, '#5a5a5a'); line(px, 10, 2, 12, 6, '#5a5a5a');
+  for (let y = 6; y < 15; y++) {
+    const l = Math.round(3 + (y - 6) * 0.3), r = Math.round(12 - (y - 6) * 0.3);
+    for (let x = l; x <= r; x++) px(x, y, x === l || x === r || y === 14 ? '#3a3a3a' : y < 9 ? (y === 6 ? '#ffd24a' : (x + y) % 3 ? '#ff7a10' : '#e04a00') : '#a8a8a8');
+  }
+});
 const _itemIcon = itemIcon;
-itemIcon = function (it) { if (it && it.k === 'bucket') return it.full ? ICON.bucketFull : ICON.bucketEmpty; return _itemIcon(it); };
+itemIcon = function (it) { if (it && it.k === 'lavaBucket') return ICON.bucketLava; if (it && it.k === 'bucket') return it.full ? ICON.bucketFull : ICON.bucketEmpty; return _itemIcon(it); };
 const _itemName = itemName;
-itemName = function (it) { if (it && it.k === 'bucket') return it.full ? 'Water Bucket (counters cobwebs, breaks falls)' : 'Bucket (right click water to refill)'; return _itemName(it); };
+itemName = function (it) { if (it && it.k === 'lavaBucket') return 'Lava Bucket (pour it on people to set them on fire)'; if (it && it.k === 'bucket') return it.full ? 'Water Bucket (counters cobwebs, breaks falls, puts out fire)' : 'Bucket (right click a water or lava source to scoop it)'; return _itemName(it); };
 const _playerControl = playerControl;
 playerControl = function (p) {
-  if (p.held && p.held.k === 'bucket' && (placePress || usePress)) { useBucket(p); placePress = usePress = false; }
+  if (p.held && (p.held.k === 'bucket' || p.held.k === 'lavaBucket') && (placePress || usePress)) { useBucket(p); placePress = usePress = false; }
   _playerControl(p);
 };
 
@@ -197,11 +279,18 @@ centerMsg = function (big, small) { if (small === 'Get ready') small = `Get read
 const _startGame = startGame;
 startGame = function () {
   syncRoster();
+  waterFlows.clear(); flowCells.clear(); lavaFlows.clear(); lavaFlowCells.clear(); lavaOwner.clear(); // fresh world: forget the last match's poured water
   _startGame();
   if (!game) return;
   const addTo = (m, it) => { const k = m.inv.findIndex(s => !s); if (k >= 0) m.inv[k] = it; };
   // player
-  if (CFG.bucket) addTo(player, { k: 'bucket', full: true });
+  // a water bucket in EVERY kit (hotbar if there's room, otherwise the inventory bag); the lava bucket comes with the bucket setting
+  if (!player.inv.some(s => s && s.k === 'bucket')) {
+    const k = player.inv.findIndex(s => !s);
+    if (k >= 0) player.inv[k] = { k: 'bucket', full: true };
+    else { if (!player.bag) player.bag = new Array(27).fill(null); const b = player.bag.findIndex(s => !s); if (b >= 0) player.bag[b] = { k: 'bucket', full: true }; }
+  } else player.inv.forEach(s => { if (s && s.k === 'bucket') s.full = true; });
+  if (CFG.bucket) addTo(player, { k: 'lavaBucket' });
   player.kitProto = JSON.parse(JSON.stringify({ inv: player.inv, arrows: player.arrows }));
   // bots
   const bots = mobs.filter(m => !m.isPlayer);
@@ -224,7 +313,7 @@ startGame = function () {
     if (CFG.botBuild && T2.build) addTo(m, { k: 'block', id: m.team === 'red' ? B.WOOL_R : m.team === 'blue' ? B.WOOL_B : B.COBBLE, n: 64 });
     if (CFG.botBuild && (T2.dig || T2.build)) addTo(m, { k: 'pick', tier: 'iron' });
     if (T2.webs && CFG.botWebs > 0) addTo(m, { k: 'block', id: B.WEB, n: CFG.botWebs });
-    if (CFG.botBuild) addTo(m, { k: 'bucket', full: true });
+    if (CFG.botBuild) { addTo(m, { k: 'bucket', full: true }); addTo(m, { k: 'lavaBucket' }); }
     m.kitProto = JSON.parse(JSON.stringify({ inv: m.inv, arrows: m.arrows }));
     m.ai.thr = newThreshold(m);
     m.ai.x = { plan: 'fight', planT: 0, webCD: 60 + ((Math.random() * 60) | 0), wallCD: 0, rt: 0, lastHits: 0 };
@@ -263,7 +352,7 @@ function lookAt(b, x, y, z, rate) {
 }
 function botDig(b, x, y, z) { // false = still digging, true = passable, 'stuck' = can't
   const id = getB(x, y, z);
-  if (!id || id === B.WATER) return true;
+  if (!id || id === B.WATER || id === B.LAVA) return true;
   if (id === 255 || BL[id].hard < 0 || BL[id].hard > 5) return 'stuck';
   const tool = BL[id].tool === 'pick' ? slotWhere(b, it => it.k === 'pick') : BL[id].tool === 'axe' ? slotWhere(b, it => it.k === 'axe') : BL[id].tool === 'sword' ? slotWhere(b, it => it.k === 'sword') : -1;
   if (tool >= 0) holdSlot(b, tool);
@@ -536,10 +625,10 @@ botTick = function (b) {
   row(0, 'moveSpeed', ['weight', 'Knockback taken (lower = heavier players)', 'rng', [30, 150, 5, '%']]);
   row(0, 'weight', ['chargedKb', 'Extra knockback: fully charged hit on the ground', 'rng', [0, 200, 10, '%']]);
   row(0, 'chargedKb', ['armorBoost', 'Armour strength (higher = die slower)', 'rng', [100, 250, 10, '%']]);
-  row(1, 'webs', ['bucket', 'Water bucket (washes away cobwebs)', 'tg']);
+  row(1, 'webs', ['bucket', 'Buckets: water + lava (water refills only from a source)', 'tg']);
   row(2, 'botItems', ['botGapples', 'Bot golden apples', 'rng', [0, 16, 1]]);
   row(2, 'botGapples', ['botWebs', 'Bot cobwebs', 'rng', [0, 16, 1]]);
-  row(2, 'botWebs', ['botBuild', 'Bots build, bridge, dig, tunnel & use water', 'tg']);
+  row(2, 'botWebs', ['botBuild', 'Bots build, bridge, dig, tunnel & use water + lava', 'tg']);
   const b = MENU[0].rows.find(x => x[0] === 'bots'); b[1] = 'Number of bots';
   const s = MENU[0].rows.find(x => x[0] === 'skill'); s[1] = 'Bot skill (used by "Slider %" difficulty)';
   const st = document.createElement('style');

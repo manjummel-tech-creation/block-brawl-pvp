@@ -37,7 +37,7 @@ const _botDigHunt = botDig;
 botDig = function (b, x, y, z) {
   if (tick - (b._hunting || -999) < 40) {
     const id = getB(x, y, z);
-    if (!id || id === B.WATER || (PLANTS && PLANTS.has(id))) return true;
+    if (!id || id === B.WATER || id === B.LAVA || (PLANTS && PLANTS.has(id))) return true;
     if (id === 255 || BL[id].hard < 0) return 'stuck';
     lookAt(b, x + 0.5, y + 0.5, z + 0.5, 40);
     if ((b._hDigT || 0) > tick) return false;

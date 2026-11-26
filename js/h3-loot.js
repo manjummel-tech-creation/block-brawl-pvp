@@ -18,7 +18,6 @@ function topUp(m) {
     if (!it) return;
     const p = proto && proto[i] && proto[i].k === it.k ? proto[i] : null;
     if (it.n !== undefined) { const want = Math.max(1, p && p.n !== undefined ? p.n : 1); if (it.n < want) it.n = want; }
-    if (it.k === 'bucket') it.full = true;
   });
   if (m.kitProto && m.kitProto.arrows && m.arrows < m.kitProto.arrows) m.arrows = m.kitProto.arrows;
   if (m.potsMax && m.pots < m.potsMax) m.pots = m.potsMax;
@@ -31,7 +30,5 @@ gameTick = function () {
   if (tick === t0 || !game) return;
   for (const m of mobs) { if (m.dead) continue; if ((m.isPlayer && !m.remote && CFG.unlimited) || (!m.isPlayer && CFG.botUnlimited)) topUp(m); }
 };
-// buckets: with unlimited loot your bucket refills right after you pour
-const _useBucketLoot = useBucket;
-useBucket = function (e) { const r = _useBucketLoot(e); if (r && e.isPlayer && CFG.unlimited && e.held && e.held.k === 'bucket') { e.held.full = true; setHeldVisual(e); } return r; };
+// buckets are never refilled for free (even with unlimited loot): water only comes from a water source
 buildMenu();

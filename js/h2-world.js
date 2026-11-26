@@ -16,8 +16,8 @@ DEF.airImmune = false;
 
 // ---------- the big biome world ----------
 function genWorld(seed) {
-  srand(seed); allocWorld(160, 64, 160); VOID_Y = -30;
-  const Nt = makeNoise(seed + 11), Nm = makeNoise(seed + 22), Nh = makeNoise(seed + 33), Nr = makeNoise(seed + 44), Nd = makeNoise(seed + 55);
+  srand(seed); allocWorld(224, 64, 224); VOID_Y = -30;
+  const Nv = makeNoise(seed + 66), Nt = makeNoise(seed + 11), Nm = makeNoise(seed + 22), Nh = makeNoise(seed + 33), Nr = makeNoise(seed + 44), Nd = makeNoise(seed + 55);
   srand(seed + 1);
   const SEA = 15, H = new Int16Array(WX * WZ), BIOME = new Uint8Array(WX * WZ); // 0 plains 1 forest 2 desert 3 snow 4 mountains 5 lake
   // 1) raw height + biome
@@ -30,6 +30,8 @@ function genWorld(seed) {
     let bio = temp < 0.36 ? 3 : (temp > 0.62 && wet < 0.5) ? 2 : wet > 0.56 ? 1 : 0;
     const mtn = clamp((ridge - 0.66) / 0.34, 0, 1);
     if (mtn > 0) { h += (mtn * mtn * (3 - 2 * mtn)) * 32 * (0.75 + 0.5 * Nd(x * 0.03, 11, z * 0.03, 2)); if (mtn > 0.3) bio = 4; }
+    const rv = Math.abs(Nv(x * 0.006, 4, z * 0.006, 3) - 0.5);
+    if (rv < 0.024 && mtn < 0.5) h = Math.min(h, 11 - (1 - rv / 0.024) * 3);                // rivers wind through the land
     const dc = Math.hypot(x - WX / 2, z - WZ / 2); if (dc < 12) h = lerp(h, 18, 1 - dc / 12); // fair start area
     Hf[x * WZ + z] = h; MT[x * WZ + z] = mtn; BIOME[x * WZ + z] = bio;
   }

@@ -537,6 +537,7 @@ const HC = { full: heartC('full'), half: heartC('half'), empty: heartC('empty'),
 const ARM9 = ['.XXX.XXX.', 'XLLLXLLLX', 'XLLLLLLLX', '.XLLLLLX.', '.XLLLLLX.', '.XLLLLLX.', '.XLLLLLX.', '.XXXXXXX.'];
 function armC(mode) { return pat(ARM9.map(r => [...r].map((ch, x) => ch === 'L' ? (mode === 'full' || (mode === 'half' && x <= 4) ? 'L' : 'E') : ch).join('')), { X: '#111', L: '#d8d8d8', E: '#3a3a3a' }); }
 const AC9 = { full: armC('full'), half: armC('half'), empty: armC('empty') };
+const FOOD_E = pat(['......XX.', '.....XWWX', '....XWWX.', '.XXXBBX..', 'XBBBBBX..', 'XBBBBX...', 'XBBBX....', '.XXX.....'], { X: '#1a0e06', W: '#3a3028', B: '#3a2418' });
 const FOOD = pat(['......XX.', '.....XWWX', '....XWWX.', '.XXXBBX..', 'XBBBBBX..', 'XBRBBX...', 'XBBBX....', '.XXX.....'], { X: '#2a1608', W: '#f0e0d0', B: '#b8682a', R: '#e08a4a' });
 
 function txt(s, x, y, size, col, align) {
@@ -607,7 +608,12 @@ function drawHUD(alpha) {
     }
     const ap = ARMOR[p.armor].pts;
     if (ap > 0) for (let i = 0; i < 10; i++) { const v = ap - i * 2; g.drawImage(v >= 2 ? AC9.full : v === 1 ? AC9.half : AC9.empty, hx + i * 8 * gs, rowY, 9 * gs, 8 * gs); }
-    for (let i = 0; i < 10; i++) g.drawImage(FOOD, hx + hw - (i + 1) * 8 * gs - gs, hpY, 9 * gs, 8 * gs);
+    { const fd = CFG.hunger === false || p.food === undefined ? 20 : Math.ceil(p.food), jig = fd <= 6 && p.foodSat <= 0;
+      for (let i = 0; i < 10; i++) {
+        const x = hx + hw - (i + 1) * 8 * gs - gs, y = hpY + (jig && (tick + i * 3) % 12 === 0 ? -gs : 0), v = fd - i * 2;
+        g.drawImage(FOOD_E, x, y, 9 * gs, 8 * gs);
+        if (v >= 2) g.drawImage(FOOD, x, y, 9 * gs, 8 * gs); else if (v === 1) g.drawImage(FOOD, 0, 0, 5, 8, x, y, 5 * gs, 8 * gs);
+      } }
     // combo / reach
     if (p.combo >= 2) txt(`${p.combo} COMBO`, cx + 14 * gs, cy - 6 * gs, 10 * gs, p.combo >= 5 ? '#ffaa00' : '#ffff70');
   }
@@ -728,7 +734,8 @@ function updateCamera(alpha, dt) {
     if (ic) {
       const blocky = it.k === 'block' || it.k === 'gapple';
       vmItem.position.set(px, py, pz); vmItem.rotation.set(rx, ry + (blocky ? 0.4 : 0), rz);
-      vmItem.scale.set(blocky ? 0.55 : -1, blocky ? 0.55 : 1, 1);
+      if (!blocky && !p.using) vmItem.position.set(px + 0.06, py - 0.04, pz);
+      vmItem.scale.set(blocky ? 0.45 : -0.62, blocky ? 0.45 : 0.62, 1);
     } else {
       vmArm.position.set(px + 0.12, py - 0.15, pz + 0.05); vmArm.rotation.set(-1.2 + rx, ry + 0.3, rz + 0.25);
     }

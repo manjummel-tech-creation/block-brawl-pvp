@@ -281,11 +281,11 @@ function buildChunk(ch) {
     const b = BL[id];
     if (b.cross) { crossQuads(x2, x, y, z, b.tiles[0]); continue; }
     if (b.liquid) {
-      const top = getB(x, y + 1, z) === B.WATER ? 1 : 0.875;
+      const top = getB(x, y + 1, z) === id ? 1 : 0.875, wet = id === B.WATER;
       for (const F of FACES) {
         const n = getB(x + F.dir[0], y + F.dir[1], z + F.dir[2]);
-        if (n === B.WATER || n === 255 || isOpaque(n)) continue;
-        quad(w, x, y, z, F, b.tiles[F.t], F.s, top);
+        if (n === id || n === 255 || isOpaque(n)) continue;
+        quad(wet ? w : o, x, y, z, F, b.tiles[F.t], wet ? F.s : 0.85 + F.s * 0.15, top);
       }
       continue;
     }

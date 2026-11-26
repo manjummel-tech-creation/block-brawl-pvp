@@ -92,7 +92,12 @@ drawHUD = function (a) {
   if (performance.now() - armorBreakT < 1500) txt(armorBreakTxt, W / 2, H / 2 - 150, 30, '#ff9a5a', 'center');
   if (player.pieces) { // durability: hits until the next piece breaks
     const left = (player.armorEvery || 35) - (player.armorHits % (player.armorEvery || 35)), n = player.pieces.filter(Boolean).length;
-    if (n > 0) txt(`Armour: ${n}/4 pieces · next break in ${left} hits`, W - 12, H - 12, 16, left <= 5 ? '#ff9a5a' : '#cfcfcf', 'right');
+    if (n > 0) {
+      const gs = clamp(Math.floor(Math.min(W / 300, H / 230)), 2, 4), hw = 182 * gs, hh = 22 * gs, hx = Math.round((W - hw) / 2), hy = H - hh - 4;
+      const s = `Armour: ${n}/4 · next break in ${left} hits`; hctx.font = '16px VT323, monospace';
+      const room = W - (hx + hw) - 24 >= hctx.measureText(s).width;   // beside the hotbar if it fits, else above the food bar
+      txt(s, room ? W - 12 : hx + hw, room ? H - 12 : hy - 24 * gs, 16, left <= 5 ? '#ff9a5a' : '#cfcfcf', 'right');
+    }
   }
 };
 

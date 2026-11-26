@@ -13,7 +13,7 @@ const _M = new THREE.Matrix4(), _T = new THREE.Matrix4(), _R = new THREE.Matrix4
 const D2R = Math.PI / 180;
 // MC "handheld" model display, firstperson_righthand: rotation [0,-90,25], translation [1.13,3.2,1.13]/16, scale 0.68
 const HANDHELD = new THREE.Matrix4().compose(new THREE.Vector3(1.13 / 16, 3.2 / 16, 1.13 / 16),
-  new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -90 * D2R, 25 * D2R, 'XYZ')), new THREE.Vector3(1.0, 1.0, 1.0)); // bigger than vanilla 0.68, like the clip
+  new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -90 * D2R, 25 * D2R, 'XYZ')), new THREE.Vector3(0.68, 0.68, 0.68)); // vanilla first-person size
 // generated items (apple, potions, bucket, wind charge): rotation [0,-90,25], translation [1.13,3.2,1.13], scale 0.68 as well
 let mcEquipK = 1;
 const _updateCameraClip = updateCamera;

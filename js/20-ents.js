@@ -334,8 +334,9 @@ function move(e, dx, dy, dz) {
   if (oz !== dz) e.vz = 0;
   // fall state
   if (e.onGround) {
+    if (dy < 0) e.fallDistance -= dy; // the last bit of the fall (the landing move) counts too, like vanilla
     if (e.fallDistance > 3 && !e.inWater) {
-      const dmg = Math.ceil(e.fallDistance - 3);
+      const dmg = Math.ceil(e.fallDistance - 3 - 1e-6);
       hurt(e, dmg, { kind: 'fall', bypass: true });
       sfx('hurt', e.x, e.y, e.z, 0.6);
     }
@@ -344,11 +345,13 @@ function move(e, dx, dy, dz) {
   } else if (dy < 0) e.fallDistance -= dy;
 }
 function updateFluidFlags(e) {
-  const b = e.box(); let water = false, web = false;
+  const b = e.box(); let water = false, web = false, lava = false;
   for (let x = Math.floor(b[0] + 0.001); x <= Math.floor(b[3] - 0.001); x++) for (let y = Math.floor(b[1] + 0.001); y <= Math.floor(b[4] - 0.001); y++) for (let z = Math.floor(b[2] + 0.001); z <= Math.floor(b[5] - 0.001); z++) {
-    const id = getB(x, y, z); if (id === B.WATER && y + 0.875 > b[1] + 0.4) water = true; if (id === B.WEB) web = true;
+    const id = getB(x, y, z); if (id === B.WATER && y + 0.875 > b[1] + 0.4) water = true; if (id === B.WEB) web = true; if (B.LAVA && id === B.LAVA && y + 0.875 > b[1] + 0.05) lava = true;
   }
   if (water && !e.inWater && e.fallDistance > 2) sfx('splash', e.x, e.y, e.z);
+  e.inRealWater = water; e.inLava = lava;
+  if (lava) water = true; // swim physics in lava too (it's just thicker)
   e.inWater = water; e.inWeb = web;
   if (water) e.fallDistance = 0;
 }
@@ -368,7 +371,7 @@ function travel(e, strafe, forward) {
     const y0 = e.y;
     moveRelative(e, strafe, forward, 0.02);
     move(e, e.vx, e.vy, e.vz);
-    e.vx *= 0.8; e.vy *= 0.8; e.vz *= 0.8; e.vy -= 0.02;
+    const fr = e.inLava ? 0.5 : 0.8; e.vx *= fr; e.vy *= fr; e.vz *= fr; e.vy -= 0.02;
     if (e.hc) { const b = e.box(); const t = [b[0] + e.vx, b[1] + 0.6 - e.y + y0 + e.vy, b[2] + e.vz, b[3] + e.vx, b[4] + 0.6 - e.y + y0 + e.vy, b[5] + e.vz]; if (boxFree(t)) e.vy = 0.3; }
     return;
   }
@@ -430,6 +433,12 @@ function die(t, src) {
   if (src.kind === 'void') msg = killer ? `${t.name} was knocked into the void by ${killer.name}` : `${t.name} fell out of the world`;
   else if (src.kind === 'fall') msg = killer ? `${t.name} was doomed to fall by ${killer.name}` : `${t.name} hit the ground too hard`;
   else if (src.kind === 'arrow') msg = `${t.name} was shot by ${killer ? killer.name : 'an arrow'}`;
+  else if (src.kind === 'suffocate') msg = `${t.name} suffocated in a wall`;
+  else if (src.kind === 'starve') msg = `${t.name} starved to death`;
+  else if (src.kind === 'explosion') msg = killer ? `${t.name} was blown up by ${killer.name}` : `${t.name} blew up`;
+  else if (src.kind === 'magma') msg = killer ? `${t.name} walked into the danger zone due to ${killer.name}` : `${t.name} discovered the floor was lava`;
+  else if (src.kind === 'lava') msg = killer ? `${t.name} tried to swim in lava to escape ${killer.name}` : `${t.name} tried to swim in lava`;
+  else if (src.kind === 'fire') msg = killer ? `${t.name} was burnt to a crisp whilst fighting ${killer.name}` : `${t.name} burned to death`;
   else msg = `${t.name} was slain by ${killer ? killer.name : '???'}`;
   if (killer) { killer.kills++; if (killer === player) sfx('kill'); }
   t.deathMsg = msg;
@@ -509,7 +518,7 @@ function rayBlocks(ox, oy, oz, dx, dy, dz, maxD) { // DDA voxel traversal
   let t = 0, face = [0, 0, 0];
   for (let i = 0; i < 200; i++) {
     const id = getB(x, y, z);
-    if (id && id !== B.WATER) return { x, y, z, id, face, dist: t };
+    if (id && (id === 255 || !BL[id].liquid)) return { x, y, z, id, face, dist: t };
     if (tx < ty && tx < tz) { t = tx; x += sx; tx += tdx; face = [-sx, 0, 0]; }
     else if (ty < tz) { t = ty; y += sy; ty += tdy; face = [0, -sy, 0]; }
     else { t = tz; z += sz; tz += tdz; face = [0, 0, -sz]; }
@@ -584,7 +593,7 @@ function tryPlace(e) {
   if (!hit) return false;
   const x = hit.x + hit.face[0], y = hit.y + hit.face[1], z = hit.z + hit.face[2];
   const cur = getB(x, y, z);
-  if (cur === 255 || (cur && cur !== B.WATER)) return false;
+  if (cur === 255 || (cur && !BL[cur].liquid)) return false;
   if (y < -YOFF || y >= WY) return false;
   if (BL[it.id].solid) for (const m of mobs) { if (m.dead) continue; const b = m.box(); if (b[0] < x + 1 && b[3] > x && b[1] < y + 1 && b[4] > y && b[2] < z + 1 && b[5] > z) return false; }
   setB(x, y, z, it.id);
